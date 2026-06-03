@@ -1,4 +1,5 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
+import logo from '@brand/Logo.png'
 import styles from './Header.module.css'
 
 export default function Header({ weekLabel }) {
@@ -18,7 +19,7 @@ export default function Header({ weekLabel }) {
             </button>
           )}
           <Link className={styles.logo} to="/">
-            <div className={styles.logoMark} aria-hidden="true" />
+            <img src={logo} alt="Blue Fit" className={styles.logoImg} />
             <div className={styles.logoText}>
               <span className={styles.logoName}>Blue Fit</span>
               <span className={styles.logoSub}>Content Studio</span>
