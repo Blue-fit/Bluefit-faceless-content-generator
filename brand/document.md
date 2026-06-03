@@ -28,10 +28,7 @@ Integrated Wellness Ecosystem: Direct digital portal integration with independen
 To maintain consistency, developers must strictly map system elements to the following aesthetic rules:
 
 ## Visual & Technical Palette
-Primary System Colors: Ocean Blue, Dark Blue, Light Blue, White.
-
-## Secondary UI Accents:
-Sand/Beige, Sunrise Orange, Natural Green Tones.
+Primary System Colors: Ocean Blue, Dark Blue, Light Blue, Black.
 
 ## System Typography:
 Montserrat.
