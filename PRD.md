@@ -28,18 +28,31 @@ The system is built **once as a template** and **deployed per client** to a dedi
 - **Audience the content is for:** the client's Instagram followers. The agent never talks to them directly.
 
 ## 3. KPIs
+### 1. Content Output Deliverables
+The agent must consistently produce brand-aligned assets without manual intervention, following these specific constraints:
+Weekly Volume: Auto-generation of exactly three posts per week, which include 1 video and 2 images
+Video Specifications: All generated video content must be between 10 and 30 seconds in duration
+Engagement-Driven Captions: Every visual asset must include a caption tailored to spark conversations in the comment section.
+Brand Alignment: Content must strictly adhere to the Blue Fit Ideology and brand values as defined in the post-kickoff requirements document.
 
-| KPI | Target | How it is measured |
-|---|---|---|
-| Weekly post delivery | 3 posts (2 image, 1 video) every Friday by 10:00 UTC | Cron success log + database row count |
-| Video duration | 5–8 seconds | Asset metadata |
-| Brand alignment | Generator uses brand RAG + active rules on every run | `reasoning_blob.brand_chunks_referenced` non-empty |
-| Engagement-driven captions | Every caption uses one of three engagement templates | `reasoning_blob.engagement_template` recorded |
-| Edit responsiveness | Tweak edits return new version within 60 seconds (P95) | Per-edit duration in usage table |
-| Memory retention | "Make this like week N" returns the referenced week's style | Similarity search hit rate |
-| Continuous improvement | User-stated preferences become rules within 1 week | Rules created from chat extraction job |
-| Spend predictability | Monthly spend stays within configured cap | `usage` table monthly aggregate |
-| Cron reliability | ≥99% weekly success rate | APScheduler success log |
+### 2. System Functionality & User Interface
+The user interface (UI) must facilitate seamless review and refinement of pre-generated content:
+Conversational Chat Interface: A dedicated UI allowing users to discuss and review posts in a natural, conversational manner.
+Weekly Chat Window: Each week and each post will have a unique chat thread to prevent operational complexity and to maintain clear historical records.
+Collaborative Editing: Users must be able to request specific edits to the visuals (videos/images) and the text (captions) directly through the chat.
+Asset Accessibility: Users must be able to access/download finalized content for manual posting to social media platforms.
+Strategic Transparency: The agent must be able to explain the logic and research behind why a specific post was created.
+
+### 3. Agent Intelligence & Feedback Loops
+The agent’s value is defined by its ability to learn from user interactions:
+Memory Retention: The agent must keep track of all historical chats, allowing users to reference past styles, e.g. ‘make this like week two’
+Continuous Improvement: The agent must demonstrate the ability to apply user feedback to future posts. For example, if a user specifies a preference for "ocean blue" over "navy blue," the agent must remember and implement this for all subsequent content.
+
+### 4. Operational Controls
+To ensure reliability and budget predictability, the following operational standards apply:
+24/7 Availability: The interface and agent must be operational and accessible at all times for user edits.
+Predictive Usage Notifications: The system must proactively notify users if their current editing activity is about to exceed the pre-defined monthly budget limit.
+Internal Prompt Support: Major structural changes that would apply to each subsequent post (e.g. increasing post volume) are managed via manual internal prompt changes by the developer
 
 ## 4. Functional requirements
 

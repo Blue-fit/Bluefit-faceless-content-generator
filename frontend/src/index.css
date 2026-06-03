@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300;1,400&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* Core brand — Black + ranges of Blue */
+  --black:       #0A0C0F;
+  --dark-blue:   #0D1B2A;
+  --ocean-blue:  #1A5E94;
+  --mid-blue:    #2980C4;
+  --light-blue:  #72B8E0;
+  --pale-blue:   #C8E4F4;
+  --sky:         #EAF4FB;
+
+  --white: #FFFFFF;
+
+  /* Text */
+  --text-primary:   #0D1B2A;
+  --text-secondary: #2D4A66;
+  --text-muted:     #6A94B0;
+
+  /* Surfaces — deep dark base, cool-blue tinted whites */
+  --border:        rgba(26, 94, 148, 0.12);
+  --border-strong: rgba(26, 94, 148, 0.25);
+  --surface:       #FFFFFF;
+  --background:    #EAF4FB;
+
+  font-family: 'Montserrat', sans-serif;
+  font-size: 16px;
+  color: var(--text-primary);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--background);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  font-family: 'Montserrat', sans-serif;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
