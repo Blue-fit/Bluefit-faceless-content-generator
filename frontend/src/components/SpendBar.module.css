@@ -1,0 +1,101 @@
+.wrap {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+}
+
+.inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 18px 40px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.labelGroup { flex-shrink: 0; min-width: 160px; }
+
+.heading {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.amount { display: flex; align-items: baseline; gap: 4px; }
+.current { font-size: 22px; font-weight: 700; color: var(--dark-blue); letter-spacing: -0.5px; }
+.sep { font-size: 14px; color: var(--text-muted); }
+.cap { font-size: 14px; color: var(--text-secondary); font-weight: 500; }
+
+.track { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+
+.barBg {
+  height: 6px;
+  background: var(--pale-blue);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.barFill.green { background: linear-gradient(90deg, #4CAF82, #6ABD9A); }
+.barFill.amber { background: linear-gradient(90deg, #E8874A, #F2A05A); }
+.barFill.red   { background: linear-gradient(90deg, #D94F4F, #E86A6A); }
+
+.ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.status {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.status.green { background: rgba(76,175,130,0.1); color: #2E8A5C; }
+.status.amber { background: rgba(232,135,74,0.12); color: #C06020; }
+.status.red   { background: rgba(217,79,79,0.1); color: #B03030; }
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status.green .dot { background: #4CAF82; }
+.status.amber .dot { background: #E8874A; }
+.status.red   .dot { background: #D94F4F; }
+
+.warning {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 10px 40px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.warning_amber { color: #C06020; }
+.warning_red   { color: #B03030; }
+.warningIcon   { font-size: 11px; }
+
+@media (max-width: 768px) {
+  .inner { padding: 16px 20px; flex-wrap: wrap; gap: 16px; }
+  .track { order: 3; flex-basis: 100%; }
+  .warning { padding: 8px 20px 12px; }
+}

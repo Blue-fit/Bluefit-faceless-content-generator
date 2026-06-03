@@ -1,0 +1,83 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+
+.inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 40px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.left { display: flex; align-items: center; gap: 14px; }
+
+.back {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--pale-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  color: var(--ocean-blue);
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.back:hover { background: var(--light-blue); }
+.back svg { width: 12px; height: 12px; }
+
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+
+.logoMark {
+  width: 34px;
+  height: 34px;
+  background: var(--dark-blue);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.logoMark::before {
+  content: '';
+  position: absolute;
+  bottom: -4px; left: -4px;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--ocean-blue);
+  opacity: 0.7;
+}
+.logoMark::after {
+  content: 'B';
+  position: relative;
+  z-index: 1;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--white);
+  letter-spacing: -0.5px;
+}
+
+.logoText { display: flex; flex-direction: column; line-height: 1; }
+.logoName { font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dark-blue); }
+.logoSub  { font-size: 9px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); margin-top: 2px; }
+
+.right {}
+.meta  { font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.crumb { font-size: 12px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.04em; }
+
+@media (max-width: 768px) {
+  .inner { padding: 0 20px; }
+}
