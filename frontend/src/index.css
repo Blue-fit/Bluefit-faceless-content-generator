@@ -7,32 +7,27 @@
 }
 
 :root {
-  /* Core brand — matched to logo navy + ring blues */
-  --ocean-blue: #1B5C8E;
-  --dark-blue: #0D1F30;
-  --mid-blue: #2476B0;
-  --light-blue: #A8CCE0;
-  --pale-blue: #E6F0F8;
-  --sky: #F2F7FB;
-
-  /* Warm accents from brand doc */
-  --sand: #E8DCC8;
-  --beige: #F5EFE4;
-  --sunrise: #D97B3A;
-  --green: #5A9270;
+  /* Core brand — Black + ranges of Blue */
+  --black:       #0A0C0F;
+  --dark-blue:   #0D1B2A;
+  --ocean-blue:  #1A5E94;
+  --mid-blue:    #2980C4;
+  --light-blue:  #72B8E0;
+  --pale-blue:   #C8E4F4;
+  --sky:         #EAF4FB;
 
   --white: #FFFFFF;
 
   /* Text */
-  --text-primary: #0D1F30;
-  --text-secondary: #3D5A72;
-  --text-muted: #7A9BAD;
+  --text-primary:   #0D1B2A;
+  --text-secondary: #2D4A66;
+  --text-muted:     #6A94B0;
 
-  /* Surfaces — warm white, not blue-tinted */
-  --border: rgba(13, 31, 48, 0.09);
-  --border-strong: rgba(13, 31, 48, 0.18);
-  --surface: #FFFFFF;
-  --background: #F5EFE4;
+  /* Surfaces — deep dark base, cool-blue tinted whites */
+  --border:        rgba(26, 94, 148, 0.12);
+  --border-strong: rgba(26, 94, 148, 0.25);
+  --surface:       #FFFFFF;
+  --background:    #EAF4FB;
 
   font-family: 'Montserrat', sans-serif;
   font-size: 16px;
