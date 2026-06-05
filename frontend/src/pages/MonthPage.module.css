@@ -37,7 +37,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 20px;
 }
 
@@ -75,28 +75,25 @@
 .badge.ready   { background: rgba(76,175,130,0.1); color: #2E8A5C; }
 .badge.pending { background: rgba(232,135,74,0.1); color: #C06020; }
 
-.weekList {
+.thumbs { display: flex; gap: 8px; margin-bottom: 18px; }
+
+.thumb {
+  flex: 1;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--pale-blue), var(--light-blue));
   display: flex;
   flex-direction: column;
-  margin-bottom: 18px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   overflow: hidden;
 }
+.thumb.video { background: linear-gradient(135deg, var(--sky), var(--pale-blue)); }
 
-.weekRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 9px 12px;
-  background: var(--sky);
-}
-.weekRow + .weekRow { border-top: 1px solid var(--border); }
-
-.weekLabel { font-size: 12px; font-weight: 600; color: var(--text-primary); }
-.weekStatus { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
-.weekStatus.ready   { color: var(--ocean-blue); }
-.weekStatus.pending { color: var(--text-muted); }
+.thumbIcon { font-size: 16px; opacity: 0.5; }
+.thumbType { font-size: 8px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ocean-blue); opacity: 0.7; }
+.thumbDuration { font-size: 8px; font-weight: 600; color: var(--ocean-blue); opacity: 0.6; }
 
 .cardFooter { display: flex; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1px solid var(--border); margin-top: auto; }
 .postCount { font-size: 12px; font-weight: 500; color: var(--text-secondary); }

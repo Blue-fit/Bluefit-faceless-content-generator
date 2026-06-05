@@ -1,42 +1,37 @@
 import { useNavigate } from 'react-router-dom'
-import { WEEKS } from '../data'
+import { MONTHS, WEEKS } from '../data'
 import styles from './HomePage.module.css'
 
-const POST_ICONS = { image: '🖼', video: '▶' }
-const STATUS_LABELS = { ready: 'Ready', pending: 'Pending' }
+function MonthCard({ month, weeks, onClick }) {
+  const readyCount = weeks.filter(w => w.status === 'ready').length
+  const allReady = readyCount === weeks.length && weeks.length > 0
 
-function WeekCard({ week, onClick }) {
   return (
-    <button className={styles.card} onClick={() => onClick(week)} aria-label={`Open ${week.label}`}>
+    <button className={styles.card} onClick={() => onClick(month)} aria-label={`Open ${month.label}`}>
       <div className={styles.cardTop}>
         <div>
-          <div className={styles.cardEyebrow}>Weekly Content</div>
-          <div className={styles.cardDate}>{week.label}</div>
+          <div className={styles.cardEyebrow}>Content Calendar</div>
+          <div className={styles.cardDate}>{month.label}</div>
         </div>
-        <span className={`${styles.badge} ${styles[week.status]}`}>
-          {STATUS_LABELS[week.status]}
+        <span className={`${styles.badge} ${allReady ? styles.ready : styles.pending}`}>
+          {readyCount}/{weeks.length} Ready
         </span>
       </div>
 
-      <div className={styles.thumbs}>
-        {week.status === 'ready' ? (
-          week.posts.map((post, i) => (
-            <div key={i} className={`${styles.thumb} ${styles[post.type]}`}>
-              <span className={styles.thumbIcon}>{POST_ICONS[post.type]}</span>
-              <span className={styles.thumbType}>{post.type}</span>
-              {post.type === 'video' && <span className={styles.thumbDuration}>{post.duration}</span>}
-            </div>
-          ))
-        ) : (
-          [0,1,2].map(i => <div key={i} className={styles.thumb}><span className={styles.thumbIcon}>·</span></div>)
-        )}
+      <div className={styles.weekList}>
+        {weeks.map(w => (
+          <div key={w.id} className={styles.weekRow}>
+            <span className={styles.weekLabel}>{w.label}</span>
+            <span className={`${styles.weekStatus} ${styles[w.status]}`}>
+              {w.status === 'ready' ? `${w.posts.length} posts` : 'Pending'}
+            </span>
+          </div>
+        ))}
       </div>
 
       <div className={styles.cardFooter}>
         <span className={styles.postCount}>
-          {week.status === 'ready'
-            ? <><strong>{week.posts.length}</strong> posts ready to review</>
-            : 'Scheduled for generation'}
+          <strong>{weeks.length}</strong> weeks &middot; <strong>{readyCount}</strong> ready to review
         </span>
         <span className={styles.arrow}>
           <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -50,23 +45,32 @@ function WeekCard({ week, onClick }) {
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const sorted = [...WEEKS].sort((a, b) => b.id.localeCompare(a.id))
-  const readyCount = sorted.filter(w => w.status === 'ready').length
+  const readyMonths = MONTHS.filter(m =>
+    WEEKS.filter(w => w.monthId === m.id).some(w => w.status === 'ready')
+  ).length
 
   return (
     <main className={styles.main}>
       <div className={styles.sectionHeader}>
         <div>
           <div className={styles.eyebrow}>Content Calendar</div>
-          <h1 className={styles.title}>Weekly Posts</h1>
+          <h1 className={styles.title}>Monthly Overview</h1>
         </div>
-        <span className={styles.count}>{readyCount} weeks ready</span>
+        <span className={styles.count}>{readyMonths} months active</span>
       </div>
 
       <div className={styles.grid}>
-        {sorted.map(week => (
-          <WeekCard key={week.id} week={week} onClick={w => navigate(`/week/${w.id}`)} />
-        ))}
+        {MONTHS.map(month => {
+          const weeks = WEEKS.filter(w => w.monthId === month.id).sort((a, b) => b.id.localeCompare(a.id))
+          return (
+            <MonthCard
+              key={month.id}
+              month={month}
+              weeks={weeks}
+              onClick={m => navigate(`/month/${m.id}`)}
+            />
+          )
+        })}
       </div>
     </main>
   )

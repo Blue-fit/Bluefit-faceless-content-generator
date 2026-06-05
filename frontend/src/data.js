@@ -1,9 +1,31 @@
-export const SPEND_CAP = 50
+export const SPEND_CAP = 250
 export const SPEND_CURRENT = 31.40
+
+export const MONTHS = [
+  { id: '2026-06', label: 'June 2026' },
+  { id: '2026-05', label: 'May 2026' },
+]
 
 export const WEEKS = [
   {
+    id: 'w-2026-26',
+    monthId: '2026-06',
+    label: 'Week of June 23',
+    dateRange: '23 – 29 Jun 2026',
+    status: 'pending',
+    posts: [],
+  },
+  {
+    id: 'w-2026-25',
+    monthId: '2026-06',
+    label: 'Week of June 16',
+    dateRange: '16 – 22 Jun 2026',
+    status: 'pending',
+    posts: [],
+  },
+  {
     id: 'w-2026-24',
+    monthId: '2026-06',
     label: 'Week of June 9',
     dateRange: '9 – 15 Jun 2026',
     status: 'pending',
@@ -11,6 +33,7 @@ export const WEEKS = [
   },
   {
     id: 'w-2026-23',
+    monthId: '2026-06',
     label: 'Week of June 2',
     dateRange: '2 – 8 Jun 2026',
     status: 'ready',
@@ -52,7 +75,32 @@ export const WEEKS = [
     ],
   },
   {
+    id: 'w-2026-20',
+    monthId: '2026-05',
+    label: 'Week of May 12',
+    dateRange: '12 – 18 May 2026',
+    status: 'ready',
+    posts: [
+      { id: 'p-010', type: 'image', caption: 'Strength isn\'t built in one session. It\'s built in every session. 💙', currentVersion: 1, totalVersions: 1, pillar: 'Keep Setting Goals', messages: [{ role: 'agent', text: 'Goal-setting pillar, quiet performance theme.' }] },
+      { id: 'p-011', type: 'image', caption: 'The best workout is the one you actually do. 🏃', currentVersion: 1, totalVersions: 1, pillar: 'Keep Moving', messages: [{ role: 'agent', text: 'Keep Moving pillar, accessible tone.' }] },
+      { id: 'p-012', type: 'video', caption: 'Hydration, movement, rest. The Blue Zone trifecta. Which one do you struggle with most? 💧', currentVersion: 1, totalVersions: 1, pillar: 'Natural Eating', duration: '20s', messages: [{ role: 'agent', text: 'Natural Eating video, 20 seconds. Question format.' }] },
+    ],
+  },
+  {
+    id: 'w-2026-19',
+    monthId: '2026-05',
+    label: 'Week of May 5',
+    dateRange: '5 – 11 May 2026',
+    status: 'ready',
+    posts: [
+      { id: 'p-013', type: 'image', caption: 'Movement is medicine. What\'s your dose today? 🌿', currentVersion: 1, totalVersions: 1, pillar: 'Keep Moving', messages: [{ role: 'agent', text: 'Keep Moving pillar, wellness angle.' }] },
+      { id: 'p-014', type: 'image', caption: 'A community that trains together, stays together. 🌊', currentVersion: 2, totalVersions: 2, pillar: 'Community', messages: [{ role: 'agent', text: 'Community pillar. Warm, inclusive tone.' }] },
+      { id: 'p-015', type: 'video', caption: 'This is what Monday morning looks like at Blue Fit. What does yours look like? ☀️', currentVersion: 1, totalVersions: 1, pillar: 'Community', duration: '22s', messages: [{ role: 'agent', text: 'Community video, 22 seconds. Monday energy.' }] },
+    ],
+  },
+  {
     id: 'w-2026-22',
+    monthId: '2026-05',
     label: 'Week of May 26',
     dateRange: '26 May – 1 Jun 2026',
     status: 'ready',
@@ -64,6 +112,7 @@ export const WEEKS = [
   },
   {
     id: 'w-2026-21',
+    monthId: '2026-05',
     label: 'Week of May 19',
     dateRange: '19 – 25 May 2026',
     status: 'ready',
