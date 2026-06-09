@@ -145,6 +145,92 @@ The cap is soft by default — the user can confirm-through. A `hard_cap_eur` op
 | Cron failure | Email | Operator |
 | Generation failure after 3 retries | Email | Operator |
 
+### 4.9 Database Schema
+Content Databases:
+
+Weeks - Stores data from each week of posts:
+─────────────────────────────────────────────
+id           UUID        — unique identifier for the row
+week_start   DATE        — the Monday that week begins (unique — prevents double generation)
+trend_brief  JSONB       — the researcher agent's structured weekly brief
+status       TEXT        — where the week is in the pipeline (pending, ready, failed)
+created_at   TIMESTAMPTZ — when the row was created
+
+Posts - Stores data from each post:
+─────────────────────────────────────────────
+id                 UUID        — unique identifier for the row
+week_id            UUID        — which week this post belongs to (FK → weeks.id)
+type               TEXT        — image or video
+pillar             TEXT        — which brand pillar (Keep Moving, Community, etc.)
+current_version_id UUID        — pointer to the live version (FK → post_versions.id)
+created_at         TIMESTAMPTZ — when the row was created
+
+Post_versions - Stores data from each post version:
+─────────────────────────────────────────────
+id                   UUID        — unique identifier for the row
+post_id              UUID        — which post this version belongs to (FK → posts.id)
+parent_version_id  UUID        — which version this was edited from (null for v1)
+version_number       INT         — 1, 2, 3... increments with each edit
+asset_url            TEXT        — link to the image or video stored in R2
+caption              TEXT        — the Instagram caption for this version
+edit_instruction     TEXT        — what the user asked for (null for generated versions)
+reasoning_blob       JSONB       — why this was made (brief IDs, brand chunks, rules used)
+reasoning_embedding  VECTOR(768) — vectorised reasoning, for "make it like week N" lookups
+created_at           TIMESTAMPTZ — when this version was created
+
+Operational Databases:
+
+Usage - Stores agent usage data (to be used for spend bar):
+─────────────────────────────────────────────
+id          UUID           — unique identifier for the row
+model       TEXT           — which AI model was called (e.g. gemini-pro, veo-3)
+call_type   TEXT           — what kind of call (image, video, caption, edit, research, explain, embedding)
+cost_eur    NUMERIC(10,6)  — how much it cost in euros, to 6 decimal places
+trigger     TEXT           — what caused the call (cron, edit, explain, ingest)
+post_id     UUID           — which post it relates to (nullable — research calls have no post)
+created_at  TIMESTAMPTZ    — when the call happened
+
+Spend bar query: 
+SELECT SUM(cost_eur) FROM usage
+WHERE created_at >= start_of_current_month
+
+Messages - Stores each message that the user and agent sends:
+─────────────────────────────────────────────
+id          UUID        — unique identifier for the row
+post_id     UUID        — which post this message belongs to (FK → posts.id)
+role        TEXT        — who sent it (user or agent)
+content     TEXT        — the message text
+created_at  TIMESTAMPTZ — when it was sent
+
+
+Context Databases:
+
+Rules - Stores the feedback that user gives to generator agent (extracted from patterns across messages for 14 days):
+─────────────────────────────────────────────
+id             UUID        — unique identifier for the row
+text           TEXT        — the preference in plain English
+confidence     REAL        — how strongly established this preference is (0.0 to 1.0)
+status         TEXT        — active or user_removed
+source_week_id UUID        — which week this rule was extracted from (FK → weeks.id)
+created_at     TIMESTAMPTZ — when the rule was created
+updated_at     TIMESTAMPTZ — when the rule was last updated
+
+Brand_chunks - Vectorized brand document to save token costs
+─────────────────────────────────────────────
+id          UUID        — unique identifier for the row
+content     TEXT        — a chunk of text from the brand document
+embedding   VECTOR(768) — the vectorised version of that chunk
+source      TEXT        — which section of the brand document it came from
+created_at  TIMESTAMPTZ — when the chunk was inserted
+
+Strategic_briefs - Stores monthly Gemini deep research strategic briefs 
+─────────────────────────────────────────────
+id          UUID        — unique identifier for the row
+month       DATE        — first day of the month this brief covers (unique)
+content     TEXT        — the full Deep Research output as plain text
+created_at  TIMESTAMPTZ — when the row was created
+
+
 ## 5. Non-functional requirements
 
 ### 5.1 Tenancy
