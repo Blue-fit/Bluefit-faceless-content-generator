@@ -47,3 +47,20 @@ dev = [
     "mypy>=1.15",
     "ruff>=0.11",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+# NOTE: not `strict = true` yet — full strict surfaces pre-existing issues in the
+# DB layer (e.g. bare `dict` in models.py). Enable strict in a pass coordinated
+# with whoever owns those files. New modules here are written strict-clean.
+
+[[tool.mypy.overrides]]
+module = [
+    "asyncpg.*",
+    "pgvector.*",
+    "boto3.*",
+    "botocore.*",
+    "resend.*",
+    "apscheduler.*",
+]
+ignore_missing_imports = true
