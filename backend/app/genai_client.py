@@ -16,8 +16,8 @@ from app.config import get_settings
 
 # Canonical model IDs — referenced by tools, agents, and meter/pricing.py.
 MODEL_FLASH = "gemini-2.5-flash"
-MODEL_PRO = "gemini-2.5-pro"
-MODEL_IMAGE = "gemini-2.5-flash-image"  # Nano Banana
+MODEL_PRO = "gemini-3.1-pro-preview"
+MODEL_IMAGE = "gemini-3.1-flash-image"  # Nano Banana
 MODEL_VIDEO = "veo-3.1-fast-generate-preview"  # Veo 3.1 Fast
 MODEL_EMBED = "text-embedding-005"  # 768-dim, matches the pgvector columns
 
