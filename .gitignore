@@ -15,6 +15,9 @@ venv/
 .coverage
 htmlcov/
 
+# --- Generated output (rendered assets, run history) ---
+backend/scripts/out/
+
 # --- Node / frontend build ---
 node_modules/
 dist/
