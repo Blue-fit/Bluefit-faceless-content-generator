@@ -46,6 +46,9 @@ class PostReferences(BaseModel):
     """What the generator leaned on — seeds the post's reasoning_blob."""
 
     theme: str | None = Field(default=None, description="TrendTheme title used.")
+    value: str | None = Field(
+        default=None, description="The Power-9 value the post embodies."
+    )
     brand_cues: list[str] = Field(default_factory=list)
     rule_applied: str | None = None
 
@@ -64,6 +67,10 @@ class PostSpec(BaseModel):
     )
     duration_seconds: int | None = Field(
         default=None, description="Clip length in seconds (video only; fixed 8)."
+    )
+    hook: str | None = Field(
+        default=None,
+        description="Video only: short on-screen opening hook text; null for images.",
     )
     caption_template: CaptionTemplate
     caption: str
