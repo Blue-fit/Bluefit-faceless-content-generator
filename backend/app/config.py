@@ -6,6 +6,7 @@ never hard-code keys elsewhere. See ``.env.example`` for the full list and
 ``CLAUDE.md`` for the "Google, R2, Resend" external-service boundary.
 """
 
+from decimal import Decimal
 from functools import lru_cache
 
 from pydantic import SecretStr
@@ -48,6 +49,9 @@ class Settings(BaseSettings):
 
     # --- App auth ---
     auth_bearer_token: SecretStr
+
+    # --- Cost governance ---
+    spend_cap_eur: Decimal = Decimal("250.00")
 
 
 @lru_cache

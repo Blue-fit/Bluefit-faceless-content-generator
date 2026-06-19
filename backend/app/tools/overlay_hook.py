@@ -1,36 +1,36 @@
-"""Burn an attractive hook caption onto a video clip with ffmpeg drawtext.
+"""Burn an attractive hook caption onto images and video clips.
 
-The hook is overlaid in post (not rendered by Veo, which can't spell reliably) so
-it is always correctly spelled in the brand font (Montserrat). This is a local
-ffmpeg call — not a paid API, so no @meter.
+Images: Pillow draws text directly (no ffmpeg font dependency).
+Videos: Pillow renders the text as a transparent PNG overlay; ffmpeg
+        composites it onto the clip using the `overlay` filter (no
+        `drawtext` / libfreetype required).
 
-Deploy dependency (Render): ffmpeg must be on PATH.
+Deploy dependency: ffmpeg must be on PATH (for video only).
 """
 
 from __future__ import annotations
 
 import asyncio
+import io
 import shutil
 import tempfile
 from pathlib import Path
 
+from PIL import Image, ImageDraw, ImageFont
+
 _FONT = Path(__file__).resolve().parents[2] / "assets" / "fonts" / "Montserrat-Bold.ttf"
 
-# Max characters per line — keeps the hook inside a narrow 9:16 (Reel) frame.
 _MAX_CHARS = 16
-
-# Brand text colours: white fill + ocean-blue outline from the Blue Fit logo
-# (ocean blue, not navy — matches the requirements doc's primary palette).
-_FILL = "white"
-_BRAND_BLUE = "0x1E6EB4"
+_FILL = (255, 255, 255)        # white
+_BRAND_BLUE = (30, 110, 180)   # #1E6EB4 — ocean blue, not navy
+_SHADOW = (0, 0, 0, 100)       # semi-transparent black drop shadow
 
 
 class OverlayError(RuntimeError):
-    """Raised when the ffmpeg hook overlay fails."""
+    """Raised when the hook overlay fails."""
 
 
 def _wrap(text: str, max_chars: int = _MAX_CHARS) -> str:
-    """Greedily wrap the hook so every line fits the narrow vertical frame width."""
     lines: list[str] = []
     current = ""
     for word in text.split():
@@ -44,68 +44,125 @@ def _wrap(text: str, max_chars: int = _MAX_CHARS) -> str:
     return "\n".join(lines)
 
 
-async def _run_ffmpeg(args: list[str], cwd: Path, out: Path) -> bytes:
-    """Run ffmpeg in `cwd` and return `out` bytes, raising OverlayError on failure."""
-    proc = await asyncio.create_subprocess_exec(
-        "ffmpeg", "-y", *args,
-        cwd=cwd,
-        stdout=asyncio.subprocess.DEVNULL,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    _, err = await proc.communicate()
-    if proc.returncode != 0 or not out.exists():
-        raise OverlayError((err or b"").decode("utf-8", "replace")[-400:])
-    return out.read_bytes()
+def _load_font(size: int) -> ImageFont.FreeTypeFont:
+    if not _FONT.exists():
+        raise OverlayError(f"Brand font not found: {_FONT}")
+    return ImageFont.truetype(str(_FONT), size)
+
+
+def _draw_hook(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.FreeTypeFont,
+    img_w: int,
+    img_h: int,
+    y_frac: float,
+    line_spacing: int = 12,
+) -> None:
+    """Draw `text` centred horizontally at `y_frac` of image height."""
+    lines = text.split("\n")
+    line_h = font.size + line_spacing
+    total_h = line_h * len(lines) - line_spacing
+    y = int(img_h * y_frac - total_h / 2)
+
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (img_w - text_w) // 2
+
+        # Drop shadow
+        draw.text((x + 2, y + 2), line, font=font, fill=_SHADOW)
+        # Outline (simulate border)
+        for dx, dy in [(-3, 0), (3, 0), (0, -3), (0, 3)]:
+            draw.text((x + dx, y + dy), line, font=font, fill=(*_BRAND_BLUE, 255))
+        # White fill
+        draw.text((x, y), line, font=font, fill=(*_FILL, 255))
+        y += line_h
+
+
+def _render_overlay_png(
+    width: int, height: int, hook: str, y_frac: float
+) -> bytes:
+    """Return a transparent RGBA PNG with the hook text drawn on it."""
+    font_size = max(20, height // 20)
+    font = _load_font(font_size)
+    canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(canvas)
+    _draw_hook(draw, _wrap(hook), font, width, height, y_frac)
+    buf = io.BytesIO()
+    canvas.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+async def overlay_hook_image(image_bytes: bytes, hook: str, ext: str = ".jpg") -> bytes:
+    """Return the still with `hook` burned in centred (Montserrat, white)."""
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+    font_size = max(20, img.height // 20)
+    font = _load_font(font_size)
+
+    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    _draw_hook(draw, _wrap(hook), font, img.width, img.height, 0.5)
+    composited = Image.alpha_composite(img, overlay)
+
+    out_mode = "RGB" if ext.lower() in (".jpg", ".jpeg") else "RGBA"
+    result = composited.convert(out_mode)
+    buf = io.BytesIO()
+    fmt = "JPEG" if out_mode == "RGB" else "PNG"
+    result.save(buf, format=fmt, quality=95)
+    return buf.getvalue()
 
 
 async def overlay_hook(video_bytes: bytes, hook: str) -> bytes:
     """Return the clip with `hook` burned in (Montserrat, white, upper third, first 3s).
 
-    Sized and wrapped for a 9:16 Reel; runs ffmpeg in a temp dir with bare
-    filenames (cwd-relative) so there is no cross-platform path escaping.
+    Uses Pillow to render the text as a transparent PNG overlay, then ffmpeg
+    `overlay` to composite it — no libfreetype / drawtext needed.
     """
-    if not _FONT.exists():
-        raise OverlayError(f"Brand font not found: {_FONT}")
-
+    # Probe the video dimensions first so the overlay PNG matches.
     with tempfile.TemporaryDirectory() as tmp:
         d = Path(tmp)
         shutil.copy(_FONT, d / "font.ttf")
         (d / "in.mp4").write_bytes(video_bytes)
-        (d / "hook.txt").write_text(_wrap(hook), encoding="utf-8")
 
-        draw = (
-            f"drawtext=fontfile=font.ttf:textfile=hook.txt:fontcolor={_FILL}:"
-            f"bordercolor={_BRAND_BLUE}:borderw=3:"
-            "fontsize=h/22:shadowcolor=black@0.4:shadowx=2:shadowy=2:line_spacing=12:"
-            "x=(w-text_w)/2:y=h*0.20:enable='lt(t,3)'"
+        # Get dimensions via ffprobe
+        probe = await asyncio.create_subprocess_exec(
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=width,height",
+            "-of", "csv=p=0",
+            "in.mp4",
+            cwd=d,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
         )
-        return await _run_ffmpeg(
-            ["-i", "in.mp4", "-vf", draw, "-c:a", "copy", "out.mp4"], d, d / "out.mp4"
+        stdout, _ = await probe.communicate()
+        try:
+            w, h = (int(x) for x in stdout.decode().strip().split(","))
+        except ValueError:
+            w, h = 720, 1280  # fallback for 9:16
+
+        overlay_png = _render_overlay_png(w, h, hook, y_frac=0.22)
+        (d / "overlay.png").write_bytes(overlay_png)
+
+        # Composite: show overlay only for the first 3 seconds
+        proc = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-y",
+            "-i", "in.mp4",
+            "-i", "overlay.png",
+            "-filter_complex",
+            "[0:v][1:v]overlay=0:0:enable='lt(t,3)'[vout]",
+            "-map", "[vout]",
+            "-map", "0:a?",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+            "-c:a", "copy",
+            "out.mp4",
+            cwd=d,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
         )
-
-
-async def overlay_hook_image(image_bytes: bytes, hook: str, ext: str = ".jpg") -> bytes:
-    """Return the still with `hook` burned in centered (Montserrat, white).
-
-    The brand wants a "pakkende oneliner centraal in beeld" on posts, so the
-    image hook sits in the centre of the 9:16 frame (vs the video's upper third).
-    """
-    if not _FONT.exists():
-        raise OverlayError(f"Brand font not found: {_FONT}")
-
-    name = f"out{ext}"
-    with tempfile.TemporaryDirectory() as tmp:
-        d = Path(tmp)
-        shutil.copy(_FONT, d / "font.ttf")
-        (d / f"in{ext}").write_bytes(image_bytes)
-        (d / "hook.txt").write_text(_wrap(hook), encoding="utf-8")
-
-        draw = (
-            f"drawtext=fontfile=font.ttf:textfile=hook.txt:fontcolor={_FILL}:"
-            f"bordercolor={_BRAND_BLUE}:borderw=4:"
-            "fontsize=h/20:shadowcolor=black@0.4:shadowx=2:shadowy=2:line_spacing=14:"
-            "x=(w-text_w)/2:y=(h-text_h)/2"
-        )
-        return await _run_ffmpeg(
-            ["-i", f"in{ext}", "-vf", draw, "-frames:v", "1", name], d, d / name
-        )
+        _, err = await proc.communicate()
+        out = d / "out.mp4"
+        if proc.returncode != 0 or not out.exists():
+            raise OverlayError((err or b"").decode("utf-8", "replace")[-400:])
+        return out.read_bytes()
