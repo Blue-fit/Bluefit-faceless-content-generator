@@ -1,5 +1,17 @@
 # Prompts changelog
 
+## 2026-06-21
+- `agents/prompts/caption_question.md`, `caption_hottake.md`, `caption_observation.md`
+  — created. Canonical specs for the three engagement caption styles the generator
+  selects per post (recorded in `reasoning_blob.engagement_template`): shape, do's/
+  don'ts, and a Blue Fit-voice example adapted from the requirements doc. Source of
+  truth for the future `generate_caption.py` (Phase-2 caption rewrite). Reason: fill
+  the empty template placeholders.
+- `agents/prompts/explain_render.md` — created. Gemini Flash prompt for the Phase-2
+  `explain` tool (PRD §4.6): renders a post's structured `reasoning_blob` into a
+  plain-English, client-friendly "why we made this", translating raw fields
+  (IDs/hashes/model names) into human terms. Reason: build the explain transparency tool.
+
 ## 2026-06-19
 - `agents/prompts/generator.md` — `hook` is now produced for **every** post
   (image and video), not video only. The brand requirements doc calls for *"een
