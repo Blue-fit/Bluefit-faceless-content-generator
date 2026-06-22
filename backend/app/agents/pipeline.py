@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import Protocol
 from uuid import UUID
 
 import structlog
@@ -42,6 +41,7 @@ from app.db.repositories.weeks import (
 )
 from app.genai_client import MODEL_EMBED, MODEL_FLASH, MODEL_PRO, embed
 from app.meter import MeteredResult, MeterRequest, meter, pricing
+from app.storage import AssetUploader
 from app.tools.brand_rag import BrandRagRequest, brand_rag
 from app.tools.generate_image import ImageRequest, generate_image
 from app.tools.generate_video import VideoRequest, generate_video
@@ -56,12 +56,6 @@ _PROMPT = Path(__file__).resolve().parent / "prompts" / "generator.md"
 
 class PipelineError(RuntimeError):
     """Raised on a fatal pipeline precondition (e.g. brand doc not ingested)."""
-
-
-class AssetUploader(Protocol):
-    """Storage seam (Jacob's R2 impl). Tests pass a fake; pipeline never does R2."""
-
-    async def upload(self, *, data: bytes, key: str, content_type: str) -> str: ...
 
 
 class WeekResult(BaseModel):
@@ -161,6 +155,9 @@ def _reasoning_blob(
         "theme": r.theme,
         "value": r.value,
         "hook": spec.hook,
+        "scene_prompt": spec.scene_prompt,
+        "motion": spec.motion,
+        "caption": spec.caption,
         "brand_cues": r.brand_cues,
         "rule_applied": r.rule_applied,
         "brand_chunk_ids": [str(i) for i in brand_chunk_ids],
