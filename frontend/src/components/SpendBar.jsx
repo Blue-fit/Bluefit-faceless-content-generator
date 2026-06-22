@@ -1,15 +1,28 @@
-import { SPEND_CAP, SPEND_CURRENT } from '../data'
+import { useEffect, useState } from 'react'
+import { fetchSpend } from '../api'
 import styles from './SpendBar.module.css'
 
-function getSpendState(current, cap) {
-  const pct = (current / cap) * 100
-  if (pct >= 100) return { state: 'red', pct: 100, label: 'Cap reached', warning: 'You have reached your monthly budget. Edits are paused until you approve further spend.' }
-  if (pct >= 80) return { state: 'amber', pct, label: 'Near limit', warning: `You've used ${pct.toFixed(0)}% of your budget. Further edits may exceed your cap.` }
-  return { state: 'green', pct, label: 'On track', warning: null }
+function getSpendState(pct) {
+  if (pct >= 100) return { state: 'red', label: 'Cap reached', warning: 'You have reached your monthly budget. Edits are paused until you approve further spend.' }
+  if (pct >= 80) return { state: 'amber', label: 'Near limit', warning: `You've used ${pct.toFixed(0)}% of your budget. Further edits may exceed your cap.` }
+  return { state: 'green', label: 'On track', warning: null }
 }
 
 export default function SpendBar() {
-  const { state, pct, label, warning } = getSpendState(SPEND_CURRENT, SPEND_CAP)
+  const [pct, setPct] = useState(0)
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    fetchSpend()
+      .then(data => {
+        const p = data.cap_eur > 0 ? (data.spent_eur / data.cap_eur) * 100 : 0
+        setPct(Math.min(p, 100))
+        setLoaded(true)
+      })
+      .catch(() => setLoaded(true))
+  }, [])
+
+  const { state, label, warning } = getSpendState(pct)
 
   return (
     <div className={styles.wrap}>
@@ -17,9 +30,8 @@ export default function SpendBar() {
         <div className={styles.labelGroup}>
           <div className={styles.heading}>Monthly Spend</div>
           <div className={styles.amount}>
-            <span className={styles.current}>€{SPEND_CURRENT.toFixed(2)}</span>
-            <span className={styles.sep}>/</span>
-            <span className={styles.cap}>€{SPEND_CAP}</span>
+            <span className={styles.current}>{loaded ? `${pct.toFixed(0)}%` : '—'}</span>
+            <span className={styles.sep}> of budget used</span>
           </div>
         </div>
 
@@ -35,15 +47,15 @@ export default function SpendBar() {
             />
           </div>
           <div className={styles.ticks}>
-            <span>€0</span>
-            <span>€{SPEND_CAP * 0.5}</span>
-            <span>€{SPEND_CAP}</span>
+            <span>0%</span>
+            <span>50%</span>
+            <span>100%</span>
           </div>
         </div>
 
         <div className={`${styles.status} ${styles[state]}`}>
           <span className={styles.dot} />
-          {label}
+          {loaded ? label : 'Loading...'}
         </div>
       </div>
 

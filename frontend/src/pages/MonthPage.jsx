@@ -1,5 +1,5 @@
 import { useParams, Navigate, useNavigate } from 'react-router-dom'
-import { MONTHS, WEEKS } from '../data'
+import { useData } from '../context/DataContext'
 import styles from './MonthPage.module.css'
 
 const POST_ICONS = { image: '🖼', video: '▶' }
@@ -24,7 +24,6 @@ function WeekCard({ week, onClick }) {
             <div key={i} className={`${styles.thumb} ${styles[post.type]}`}>
               <span className={styles.thumbIcon}>{POST_ICONS[post.type]}</span>
               <span className={styles.thumbType}>{post.type}</span>
-              {post.type === 'video' && <span className={styles.thumbDuration}>{post.duration}</span>}
             </div>
           ))
         ) : (
@@ -51,12 +50,13 @@ function WeekCard({ week, onClick }) {
 export default function MonthPage() {
   const { monthId } = useParams()
   const navigate = useNavigate()
-  const month = MONTHS.find(m => m.id === monthId)
-  const weeks = WEEKS.filter(w => w.monthId === monthId).sort((a, b) => b.id.localeCompare(a.id))
+  const { months, weeks } = useData()
+  const month = months.find(m => m.id === monthId)
+  const monthWeeks = weeks.filter(w => w.monthId === monthId).sort((a, b) => b.id.localeCompare(a.id))
 
   if (!month) return <Navigate to="/" replace />
 
-  const readyCount = weeks.filter(w => w.status === 'ready').length
+  const readyCount = monthWeeks.filter(w => w.status === 'ready').length
 
   return (
     <main className={styles.main}>
@@ -69,7 +69,7 @@ export default function MonthPage() {
       </div>
 
       <div className={styles.grid}>
-        {weeks.map(week => (
+        {monthWeeks.map(week => (
           <WeekCard key={week.id} week={week} onClick={w => navigate(`/week/${w.id}`)} />
         ))}
       </div>

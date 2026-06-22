@@ -1,11 +1,12 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import logo from '@brand/Logo.png'
-import { WEEKS } from '../data'
+import { useData } from '../context/DataContext'
 import styles from './Header.module.css'
 
 export default function Header({ monthLabel, weekLabel }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { weeks } = useData()
   const isMonthPage = location.pathname.startsWith('/month/')
   const isWeekPage = location.pathname.startsWith('/week/')
   const showBack = isMonthPage || isWeekPage
@@ -13,7 +14,7 @@ export default function Header({ monthLabel, weekLabel }) {
   function handleBack() {
     if (isWeekPage) {
       const weekId = location.pathname.split('/week/')[1]
-      const week = WEEKS.find(w => w.id === weekId)
+      const week = weeks.find(w => w.id === weekId)
       navigate(week ? `/month/${week.monthId}` : '/')
     } else {
       navigate('/')

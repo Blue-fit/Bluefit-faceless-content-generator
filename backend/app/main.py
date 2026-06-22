@@ -1,11 +1,16 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.db.connection import close_pool, create_pool
+from app.routes.chat import router as chat_router
+from app.routes.download import router as download_router
 from app.routes.health import router as health_router
+from app.routes.posts import router as posts_router
 from app.routes.usage import router as usage_router
 
 
@@ -27,4 +32,11 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(posts_router)
+app.include_router(chat_router)
 app.include_router(usage_router)
+app.include_router(download_router)
+
+_ASSETS = Path(__file__).resolve().parent.parent.parent / "scripts" / "out" / "pipeline"
+_ASSETS.mkdir(parents=True, exist_ok=True)
+app.mount("/assets", StaticFiles(directory=_ASSETS), name="assets")

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { MONTHS, WEEKS } from '../data'
+import { useData } from '../context/DataContext'
 import styles from './HomePage.module.css'
 
 function MonthCard({ month, weeks, onClick }) {
@@ -45,9 +45,14 @@ function MonthCard({ month, weeks, onClick }) {
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const readyMonths = MONTHS.filter(m =>
-    WEEKS.filter(w => w.monthId === m.id).some(w => w.status === 'ready')
+  const { months, weeks, loading, error } = useData()
+
+  const readyMonths = months.filter(m =>
+    weeks.filter(w => w.monthId === m.id).some(w => w.status === 'ready')
   ).length
+
+  if (loading) return <main className={styles.main}><p style={{ color: 'var(--text-muted)' }}>Loading...</p></main>
+  if (error) return <main className={styles.main}><p style={{ color: 'red' }}>Failed to load: {error}</p></main>
 
   return (
     <main className={styles.main}>
@@ -60,13 +65,13 @@ export default function HomePage() {
       </div>
 
       <div className={styles.grid}>
-        {MONTHS.map(month => {
-          const weeks = WEEKS.filter(w => w.monthId === month.id).sort((a, b) => b.id.localeCompare(a.id))
+        {months.map(month => {
+          const monthWeeks = weeks.filter(w => w.monthId === month.id).sort((a, b) => b.id.localeCompare(a.id))
           return (
             <MonthCard
               key={month.id}
               month={month}
-              weeks={weeks}
+              weeks={monthWeeks}
               onClick={m => navigate(`/month/${m.id}`)}
             />
           )

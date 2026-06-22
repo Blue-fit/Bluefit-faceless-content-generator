@@ -1,41 +1,108 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
-import { WEEKS, PILLAR_COLORS } from '../data'
+import { useData } from '../context/DataContext'
+import { sendChatMessage } from '../api'
+import { PILLAR_COLORS } from '../data'
 import styles from './WeekPage.module.css'
+
+function MediaModal({ url, type, onClose }) {
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+        <button className={styles.modalClose} onClick={onClose} aria-label="Close">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M1 1l12 12M13 1L1 13" />
+          </svg>
+        </button>
+        {type === 'video'
+          ? <video src={url} controls autoPlay className={styles.modalMedia} />
+          : <img src={url} alt="Full post" className={styles.modalMedia} />
+        }
+      </div>
+    </div>
+  )
+}
+
+function downloadAsset(url, pillar) {
+  const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+  const slug = pillar.toLowerCase().replace(/\s+/g, '-')
+  const a = document.createElement('a')
+  a.href = `${BASE}/download?url=${encodeURIComponent(url)}&pillar=${encodeURIComponent(slug)}`
+  a.click()
+}
 
 function PostCard({ post }) {
   const [messages, setMessages] = useState(post.messages)
   const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
   const [showExplain, setShowExplain] = useState(false)
+  const [showModal, setShowModal] = useState(false)
   const [currentVersion, setCurrentVersion] = useState(post.currentVersion)
+  const [totalVersions, setTotalVersions] = useState(post.totalVersions)
+  const [caption, setCaption] = useState(post.caption)
   const pillarStyle = PILLAR_COLORS[post.pillar] || {}
 
-  function sendMessage(e) {
+  async function sendMessage(e) {
     e.preventDefault()
-    if (!input.trim()) return
-    const userMsg = { role: 'user', text: input.trim() }
-    const agentReply = { role: 'agent', text: `Got it — I'll apply your edit: "${input.trim()}". Generating a new version now...` }
-    setMessages(prev => [...prev, userMsg, agentReply])
-    setCurrentVersion(v => v + 1)
+    if (!input.trim() || sending) return
+    const text = input.trim()
     setInput('')
+    setMessages(prev => [...prev, { role: 'user', text }])
+    setSending(true)
+    try {
+      const result = await sendChatMessage(post.id, text)
+      setMessages(prev => [...prev, { role: result.role, text: result.text }])
+      if (result.version) {
+        setCurrentVersion(result.version.version_number)
+        setTotalVersions(v => Math.max(v, result.version.version_number))
+        if (result.version.caption) setCaption(result.version.caption)
+      }
+    } catch {
+      setMessages(prev => [...prev, { role: 'agent', text: 'Something went wrong. Please try again.' }])
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
     <div className={styles.postCard}>
       {/* Post preview */}
+      {showModal && <MediaModal url={post.asset_url} type={post.type} onClose={() => setShowModal(false)} />}
       <div className={`${styles.preview} ${styles[post.type]}`}>
         <div className={styles.previewInner}>
-          <span className={styles.previewIcon}>{post.type === 'video' ? '▶' : '🖼'}</span>
-          <span className={styles.previewType}>{post.type === 'video' ? `Video · ${post.duration}` : 'Image'}</span>
+          {post.asset_url ? (
+            post.type === 'video'
+              ? <video src={post.asset_url} controls className={styles.previewMedia} />
+              : <img src={post.asset_url} alt="Post asset" className={styles.previewMedia} />
+          ) : (
+            <>
+              <span className={styles.previewIcon}>{post.type === 'video' ? '▶' : '🖼'}</span>
+              <span className={styles.previewType}>{post.type === 'video' ? 'Video' : 'Image'}</span>
+            </>
+          )}
         </div>
-        <div className={styles.previewActions}>
-          <button className={styles.downloadBtn} title="Download asset">
-            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 1v8M4 6l3 3 3-3M2 11h10" />
-            </svg>
-            Download
-          </button>
-        </div>
+        {post.asset_url && (
+          <div className={styles.previewActions}>
+            <button className={styles.viewBtn} onClick={() => setShowModal(true)}>
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 7s2.5-5 6-5 6 5 6 5-2.5 5-6 5-6-5-6-5z" /><circle cx="7" cy="7" r="2" />
+              </svg>
+              View
+            </button>
+            <button className={styles.downloadBtn} onClick={() => downloadAsset(post.asset_url, post.pillar)}>
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 1v8M4 6l3 3 3-3M2 11h10" />
+              </svg>
+              Download
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Post meta */}
@@ -44,7 +111,7 @@ function PostCard({ post }) {
           <span className={styles.pillar} style={{ background: pillarStyle.bg, color: pillarStyle.text }}>
             {post.pillar}
           </span>
-          <span className={styles.version}>Version {currentVersion} of {Math.max(post.totalVersions, currentVersion)}</span>
+          <span className={styles.version}>Version {currentVersion} of {Math.max(totalVersions, currentVersion)}</span>
         </div>
         <button
           className={`${styles.explainBtn} ${showExplain ? styles.explainActive : ''}`}
@@ -62,14 +129,14 @@ function PostCard({ post }) {
       {showExplain && (
         <div className={styles.explainPanel}>
           <div className={styles.explainTitle}>Strategic reasoning</div>
-          <p>This post was created based on this week's trend research, which identified <strong>sustainable movement</strong> as a high-engagement topic for Blue Fit's audience. The <strong>{post.pillar}</strong> pillar was selected to balance this week's content mix. The caption uses the <strong>{post.type === 'video' ? 'question' : 'observation'}</strong> engagement template to drive comments.</p>
+          <p>This post was created based on this week's trend research. The <strong>{post.pillar}</strong> pillar was selected to balance this week's content mix. The caption uses the <strong>{post.type === 'video' ? 'question' : 'observation'}</strong> engagement template to drive comments.</p>
         </div>
       )}
 
       {/* Caption */}
       <div className={styles.caption}>
         <div className={styles.captionLabel}>Caption</div>
-        <p className={styles.captionText}>{post.caption}</p>
+        <p className={styles.captionText}>{caption}</p>
       </div>
 
       {/* Chat thread */}
@@ -79,11 +146,17 @@ function PostCard({ post }) {
           {messages.map((msg, i) => (
             <div key={i} className={`${styles.message} ${styles[msg.role]}`}>
               <div className={styles.messageAvatar}>
-                {msg.role === 'agent' ? 'BF' : 'You'}
+                {msg.role === 'agent' || msg.role === 'model' ? 'BF' : 'You'}
               </div>
               <div className={styles.messageBubble}>{msg.text}</div>
             </div>
           ))}
+          {sending && (
+            <div className={`${styles.message} ${styles.agent}`}>
+              <div className={styles.messageAvatar}>BF</div>
+              <div className={styles.messageBubble} style={{ opacity: 0.5 }}>Generating...</div>
+            </div>
+          )}
         </div>
 
         <form className={styles.chatForm} onSubmit={sendMessage}>
@@ -92,8 +165,9 @@ function PostCard({ post }) {
             value={input}
             onChange={e => setInput(e.target.value)}
             placeholder="Request an edit, ask a question..."
+            disabled={sending}
           />
-          <button className={styles.sendBtn} type="submit" disabled={!input.trim()}>
+          <button className={styles.sendBtn} type="submit" disabled={!input.trim() || sending}>
             <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M13 1L1 7l5 2 2 5 5-13z" />
             </svg>
@@ -106,7 +180,8 @@ function PostCard({ post }) {
 
 export default function WeekPage() {
   const { weekId } = useParams()
-  const week = WEEKS.find(w => w.id === weekId)
+  const { weeks } = useData()
+  const week = weeks.find(w => w.id === weekId)
 
   if (!week) return <Navigate to="/" replace />
   if (week.status === 'pending') {

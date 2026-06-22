@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     r2_secret_access_key: SecretStr
     r2_bucket: str
     r2_endpoint_url: str
+    r2_public_url: str
 
     # --- Resend (email) ---
     resend_api_key: SecretStr
@@ -51,7 +52,7 @@ class Settings(BaseSettings):
     auth_bearer_token: SecretStr
 
     # --- Cost governance ---
-    spend_cap_eur: Decimal = Decimal("250.00")
+    spend_cap_eur: Decimal = Decimal("100.00")
 
 
 @lru_cache

@@ -4,12 +4,13 @@ import SpendBar from './components/SpendBar'
 import HomePage from './pages/HomePage'
 import MonthPage from './pages/MonthPage'
 import WeekPage from './pages/WeekPage'
-import { MONTHS, WEEKS } from './data'
+import { DataProvider, useData } from './context/DataContext'
 import './App.css'
 
 function MonthPageWrapper() {
   const { monthId } = useParams()
-  const month = MONTHS.find(m => m.id === monthId)
+  const { months } = useData()
+  const month = months.find(m => m.id === monthId)
   return (
     <>
       <Header monthLabel={month?.label} />
@@ -21,7 +22,8 @@ function MonthPageWrapper() {
 
 function WeekPageWrapper() {
   const { weekId } = useParams()
-  const week = WEEKS.find(w => w.id === weekId)
+  const { weeks } = useData()
+  const week = weeks.find(w => w.id === weekId)
   return (
     <>
       <Header weekLabel={week?.label} />
@@ -34,19 +36,21 @@ function WeekPageWrapper() {
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="app">
-        <Routes>
-          <Route path="/" element={
-            <>
-              <Header />
-              <SpendBar />
-              <HomePage />
-            </>
-          } />
-          <Route path="/month/:monthId" element={<MonthPageWrapper />} />
-          <Route path="/week/:weekId" element={<WeekPageWrapper />} />
-        </Routes>
-      </div>
+      <DataProvider>
+        <div className="app">
+          <Routes>
+            <Route path="/" element={
+              <>
+                <Header />
+                <SpendBar />
+                <HomePage />
+              </>
+            } />
+            <Route path="/month/:monthId" element={<MonthPageWrapper />} />
+            <Route path="/week/:weekId" element={<WeekPageWrapper />} />
+          </Routes>
+        </div>
+      </DataProvider>
     </BrowserRouter>
   )
 }

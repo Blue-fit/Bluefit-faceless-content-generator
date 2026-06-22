@@ -17,26 +17,14 @@ from dotenv import load_dotenv
 
 from app.agents.pipeline import run_weekly
 from app.db.connection import close_pool, create_pool
-
-OUT = Path(__file__).resolve().parent / "out" / "pipeline"
-
-
-class LocalUploader:
-    """Stand-in for the R2 AssetUploader: write bytes to disk, return a file URL."""
-
-    async def upload(self, *, data: bytes, key: str, content_type: str) -> str:
-        path = OUT / key
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
-        return path.as_uri()
+from app.storage.r2 import R2Uploader
 
 
 async def main() -> None:
     load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-    OUT.mkdir(parents=True, exist_ok=True)
     await create_pool()
     try:
-        result = await run_weekly(date.today(), uploader=LocalUploader())
+        result = await run_weekly(date.today(), uploader=R2Uploader())
         print("\n=== WeekResult ===")
         print("status   :", result.status)
         print("week_id  :", result.week_id)
