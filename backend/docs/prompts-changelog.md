@@ -1,5 +1,11 @@
 # Prompts changelog
 
+## 2026-06-22
+- `agents/prompts/learning_extract.md` — created. Gemini Flash prompt for the Phase-2
+  learning loop: distills the last 14 days of edit instructions into durable brand
+  `rules` (imperative, generalised, with confidence; merges duplicates). Reason: build
+  the nightly rule-extraction loop.
+
 ## 2026-06-21
 - `agents/prompts/caption_question.md`, `caption_hottake.md`, `caption_observation.md`
   — created. Canonical specs for the three engagement caption styles the generator

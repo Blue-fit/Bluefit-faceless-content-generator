@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 import asyncpg
@@ -97,3 +98,24 @@ async def search_by_reasoning(
         limit,
     )
     return [_row_to_version(r) for r in rows]
+
+
+async def recent_edit_instructions(
+    conn: asyncpg.Connection, since: datetime, limit: int = 200
+) -> list[str]:
+    """Edit instructions from versions created since `since` (newest first).
+
+    The learning loop distills these into durable `rules`.
+    """
+    rows = await conn.fetch(
+        """
+        SELECT edit_instruction
+        FROM post_versions
+        WHERE edit_instruction IS NOT NULL AND created_at >= $1
+        ORDER BY created_at DESC
+        LIMIT $2
+        """,
+        since,
+        limit,
+    )
+    return [r["edit_instruction"] for r in rows]
