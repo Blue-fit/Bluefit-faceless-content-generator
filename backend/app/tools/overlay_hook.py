@@ -114,7 +114,7 @@ async def overlay_hook_image(image_bytes: bytes, hook: str, ext: str = ".jpg") -
 
 
 async def overlay_hook(video_bytes: bytes, hook: str) -> bytes:
-    """Return the clip with `hook` burned in (Montserrat, white, upper third, first 3s).
+    """Return the clip with `hook` burned in (Montserrat, white, upper third, full clip).
 
     Uses Pillow to render the text as a transparent PNG overlay, then ffmpeg
     `overlay` to composite it — no libfreetype / drawtext needed.
@@ -145,13 +145,13 @@ async def overlay_hook(video_bytes: bytes, hook: str) -> bytes:
         overlay_png = _render_overlay_png(w, h, hook, y_frac=0.22)
         (d / "overlay.png").write_bytes(overlay_png)
 
-        # Composite: show overlay only for the first 3 seconds
+        # Composite: show the hook for the entire clip
         proc = await asyncio.create_subprocess_exec(
             "ffmpeg", "-y",
             "-i", "in.mp4",
             "-i", "overlay.png",
             "-filter_complex",
-            "[0:v][1:v]overlay=0:0:enable='lt(t,3)'[vout]",
+            "[0:v][1:v]overlay=0:0[vout]",
             "-map", "[vout]",
             "-map", "0:a?",
             "-c:v", "libx264", "-preset", "fast", "-crf", "18",
