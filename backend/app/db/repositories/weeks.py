@@ -38,6 +38,12 @@ async def get_week_by_start(conn: asyncpg.Connection, week_start: date) -> Week 
     return _row_to_week(row) if row else None
 
 
+async def list_weeks(conn: asyncpg.Connection) -> list[Week]:
+    """All weeks oldest-first, so index 0 is 'week one' for 'make this like week N'."""
+    rows = await conn.fetch("SELECT * FROM weeks ORDER BY week_start ASC")
+    return [_row_to_week(r) for r in rows]
+
+
 async def set_week_brief(
     conn: asyncpg.Connection,
     week_id: UUID,

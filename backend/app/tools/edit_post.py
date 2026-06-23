@@ -8,21 +8,25 @@ dispatches paid tools (each @meter-wrapped); `edit_post` itself is the orchestra
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 from typing import Literal, cast, get_args
 from uuid import UUID
 
+import asyncpg
 import structlog
 from pydantic import BaseModel
 
 from app.agents.prompt_builder import build_image_prompt, build_video_prompt
 from app.db.connection import get_pool
+from app.db.models import Week
 from app.db.repositories.post_versions import (
     count_versions_for_post,
     get_version,
     insert_version,
 )
-from app.db.repositories.posts import get_post, set_current_version
+from app.db.repositories.posts import get_post, get_posts_for_week, set_current_version
+from app.db.repositories.weeks import list_weeks
 from app.genai_client import MODEL_FLASH, get_genai_client
 from app.meter import MeteredResult, MeterRequest, meter, pricing
 from app.storage import AssetUploader
@@ -80,9 +84,68 @@ Decide:
 - For a caption edit, set "caption_instruction" to a concise directive; set
   "caption_template" only if the engagement style should change
   (question|hottake|observation), else null.
+- If a "## Reference posts" section is present, the user is asking to emulate that
+  past week's style (e.g. "make this like week two"). Base "new_scene_prompt" (asset)
+  or "caption_instruction" (caption) on the referenced posts' scene/caption style,
+  adapted to THIS post's pillar — do not copy their subject verbatim.
 
 Return exactly the keys:
 {"target","mode","new_scene_prompt","caption_template","caption_instruction"}"""
+
+
+# ---- "make this like week N" reference resolution ---------------------------
+
+_NUM_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+}
+_WEEK_ORDINAL = re.compile(r"\bweek\s+(\d+|" + "|".join(_NUM_WORDS) + r")\b", re.IGNORECASE)
+_WEEK_RELATIVE = re.compile(r"\b(?:last|previous|prior)\s+week\b|\bweek\s+before\b", re.IGNORECASE)
+
+
+def _referenced_week_id(
+    instruction: str, weeks: list[Week], current_week_id: UUID
+) -> UUID | None:
+    """Resolve 'week two' / 'last week' to a past week's id (weeks oldest-first)."""
+    if _WEEK_RELATIVE.search(instruction):
+        cur = next((w for w in weeks if w.id == current_week_id), None)
+        earlier = [w for w in weeks if cur is not None and w.week_start < cur.week_start]
+        return earlier[-1].id if earlier else None
+    m = _WEEK_ORDINAL.search(instruction)
+    if m:
+        tok = m.group(1).lower()
+        n = int(tok) if tok.isdigit() else _NUM_WORDS[tok]
+        if 1 <= n <= len(weeks):
+            return weeks[n - 1].id
+    return None
+
+
+async def _reference_block(
+    conn: asyncpg.Connection, current_week_id: UUID, instruction: str
+) -> str | None:
+    """If the instruction names a past week, return that week's posts' style for
+    the classifier to emulate. None if no reference (the common case)."""
+    weeks = await list_weeks(conn)
+    target_id = _referenced_week_id(instruction, weeks, current_week_id)
+    if target_id is None or target_id == current_week_id:
+        return None
+    lines: list[str] = []
+    for p in await get_posts_for_week(conn, target_id):
+        if p.current_version_id is None:
+            continue
+        v = await get_version(conn, p.current_version_id)
+        if v is None:
+            continue
+        b = v.reasoning_blob or {}
+        lines.append(
+            f"- pillar: {b.get('pillar') or p.pillar} | scene: {b.get('scene_prompt')} "
+            f"| hook: {b.get('hook')} | caption: {v.caption}"
+        )
+    if not lines:
+        return None
+    target = next((w for w in weeks if w.id == target_id), None)
+    label = f"week of {target.week_start}" if target else "referenced week"
+    return f"## Reference posts ({label})\n" + "\n".join(lines)
 
 
 # ---- metered instruction classifier ----------------------------------------
@@ -163,6 +226,7 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
             raise EditError(f"post {req.post_id} has no current version.")
         current = await get_version(conn, post.current_version_id)
         count = await count_versions_for_post(conn, req.post_id)
+        reference = await _reference_block(conn, post.week_id, req.instruction)
     if current is None:
         raise EditError("current version is missing.")
 
@@ -178,9 +242,13 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         f"type: {post.type}\npillar: {post.pillar}\n"
         f"scene_prompt: {blob.get('scene_prompt')}\ncaption: {current.caption}"
     )
+    ref_section = f"\n\n{reference}" if reference else ""
     classify = await _classify(
         _ClassifyRequest(
-            text=f"{_CLASSIFY}\n\n## Current post\n{summary}\n\n## Instruction\n{req.instruction}",
+            text=(
+                f"{_CLASSIFY}\n\n## Current post\n{summary}{ref_section}"
+                f"\n\n## Instruction\n{req.instruction}"
+            ),
             trigger="edit",
             post_id=req.post_id,
         )
