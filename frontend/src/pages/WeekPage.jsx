@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
-import { sendChatMessage } from '../api'
+import { sendChatMessage, fetchExplain } from '../api'
 import { PILLAR_COLORS } from '../data'
 import styles from './WeekPage.module.css'
 
@@ -42,7 +42,28 @@ function PostCard({ post }) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [showExplain, setShowExplain] = useState(false)
+  const [explainText, setExplainText] = useState(null)
+  const [explainLoading, setExplainLoading] = useState(false)
+  const [explainError, setExplainError] = useState(false)
   const [showModal, setShowModal] = useState(false)
+
+  async function toggleExplain() {
+    const next = !showExplain
+    setShowExplain(next)
+    if (next && explainText == null && !explainLoading) {
+      setExplainLoading(true)
+      setExplainError(false)
+      try {
+        const data = await fetchExplain(post.id)
+        setExplainText(data.explanation)
+      } catch {
+        setExplainError(true)
+      } finally {
+        setExplainLoading(false)
+      }
+    }
+  }
+
   const [currentVersion, setCurrentVersion] = useState(post.currentVersion)
   const [totalVersions, setTotalVersions] = useState(post.totalVersions)
   const [caption, setCaption] = useState(post.caption)
@@ -115,7 +136,7 @@ function PostCard({ post }) {
         </div>
         <button
           className={`${styles.explainBtn} ${showExplain ? styles.explainActive : ''}`}
-          onClick={() => setShowExplain(v => !v)}
+          onClick={toggleExplain}
         >
           <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="7" cy="7" r="6" />
@@ -129,7 +150,11 @@ function PostCard({ post }) {
       {showExplain && (
         <div className={styles.explainPanel}>
           <div className={styles.explainTitle}>Strategic reasoning</div>
-          <p>This post was created based on this week's trend research. The <strong>{post.pillar}</strong> pillar was selected to balance this week's content mix. The caption uses the <strong>{post.type === 'video' ? 'question' : 'observation'}</strong> engagement template to drive comments.</p>
+          {explainLoading && <p>Generating explanation…</p>}
+          {explainError && <p>Couldn't load the explanation — please try again.</p>}
+          {!explainLoading && !explainError && explainText && (
+            <p style={{ whiteSpace: 'pre-wrap' }}>{explainText}</p>
+          )}
         </div>
       )}
 
