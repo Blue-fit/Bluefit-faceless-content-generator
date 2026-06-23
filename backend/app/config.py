@@ -40,10 +40,10 @@ class Settings(BaseSettings):
     r2_public_url: str
 
     # --- Resend (email) ---
-    resend_api_key: SecretStr
-    email_from: str
-    client_email: str
-    operator_email: str
+    resend_api_key: SecretStr = SecretStr("")
+    email_from: str = ""
+    client_email: str = ""
+    operator_email: str = ""
 
     # --- Postgres (asyncpg DSN) ---
     database_url: str
