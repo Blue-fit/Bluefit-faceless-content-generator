@@ -26,6 +26,7 @@ app = FastAPI(title="Content Agent", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
+    allow_origin_regex=r"https://bluefit-faceless-content-generator.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
