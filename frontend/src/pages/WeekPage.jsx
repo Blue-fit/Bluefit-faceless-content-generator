@@ -67,7 +67,7 @@ function PostCard({ post }) {
   const [currentVersion, setCurrentVersion] = useState(post.currentVersion)
   const [totalVersions, setTotalVersions] = useState(post.totalVersions)
   const [caption, setCaption] = useState(post.caption)
-  const [assetUrl, setAssetUrl] = useState(assetUrl)
+  const [assetUrl, setAssetUrl] = useState(post.asset_url)
   const pillarStyle = PILLAR_COLORS[post.pillar] || {}
 
   async function sendMessage(e) {
@@ -207,9 +207,10 @@ function PostCard({ post }) {
 
 export default function WeekPage() {
   const { weekId } = useParams()
-  const { weeks } = useData()
+  const { weeks, loading } = useData()
   const week = weeks.find(w => w.id === weekId)
 
+  if (loading) return <main className={styles.main} />
   if (!week) return <Navigate to="/" replace />
   if (week.status === 'pending') {
     return (
