@@ -67,6 +67,7 @@ function PostCard({ post }) {
   const [currentVersion, setCurrentVersion] = useState(post.currentVersion)
   const [totalVersions, setTotalVersions] = useState(post.totalVersions)
   const [caption, setCaption] = useState(post.caption)
+  const [assetUrl, setAssetUrl] = useState(assetUrl)
   const pillarStyle = PILLAR_COLORS[post.pillar] || {}
 
   async function sendMessage(e) {
@@ -83,6 +84,7 @@ function PostCard({ post }) {
         setCurrentVersion(result.version.version_number)
         setTotalVersions(v => Math.max(v, result.version.version_number))
         if (result.version.caption) setCaption(result.version.caption)
+        if (result.version.asset_url) setAssetUrl(result.version.asset_url)
       }
     } catch {
       setMessages(prev => [...prev, { role: 'agent', text: 'Something went wrong. Please try again.' }])
@@ -94,13 +96,13 @@ function PostCard({ post }) {
   return (
     <div className={styles.postCard}>
       {/* Post preview */}
-      {showModal && <MediaModal url={post.asset_url} type={post.type} onClose={() => setShowModal(false)} />}
+      {showModal && <MediaModal url={assetUrl} type={post.type} onClose={() => setShowModal(false)} />}
       <div className={`${styles.preview} ${styles[post.type]}`}>
         <div className={styles.previewInner}>
-          {post.asset_url ? (
+          {assetUrl ? (
             post.type === 'video'
-              ? <video src={post.asset_url} controls className={styles.previewMedia} />
-              : <img src={post.asset_url} alt="Post asset" className={styles.previewMedia} />
+              ? <video src={assetUrl} controls className={styles.previewMedia} />
+              : <img src={assetUrl} alt="Post asset" className={styles.previewMedia} />
           ) : (
             <>
               <span className={styles.previewIcon}>{post.type === 'video' ? '▶' : '🖼'}</span>
@@ -108,7 +110,7 @@ function PostCard({ post }) {
             </>
           )}
         </div>
-        {post.asset_url && (
+        {assetUrl && (
           <div className={styles.previewActions}>
             <button className={styles.viewBtn} onClick={() => setShowModal(true)}>
               <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -116,7 +118,7 @@ function PostCard({ post }) {
               </svg>
               View
             </button>
-            <button className={styles.downloadBtn} onClick={() => downloadAsset(post.asset_url, post.pillar)}>
+            <button className={styles.downloadBtn} onClick={() => downloadAsset(assetUrl, post.pillar)}>
               <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M7 1v8M4 6l3 3 3-3M2 11h10" />
               </svg>
