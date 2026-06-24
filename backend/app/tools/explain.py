@@ -13,7 +13,7 @@ from uuid import UUID
 
 from app.db.connection import get_pool
 from app.db.repositories.post_versions import get_version
-from app.genai_client import MODEL_FLASH, get_genai_client
+from app.genai_client import MODEL_FLASH, generate_text
 from app.meter import MeteredResult, MeterRequest, meter, pricing
 from app.tools import ToolError
 
@@ -40,9 +40,7 @@ async def explain(req: ExplainRequest) -> ExplainResult:
 
     blob_json = json.dumps(version.reasoning_blob, ensure_ascii=False, indent=2)
     contents = f"{_PROMPT.read_text(encoding='utf-8')}\n\n## Reasoning record (JSON)\n{blob_json}"
-    response = await get_genai_client().aio.models.generate_content(
-        model=MODEL_FLASH, contents=contents
-    )
+    response = await generate_text(MODEL_FLASH, contents)
     text = (response.text or "").strip()
     if not text:
         raise ToolError("explain: Flash returned no text.")

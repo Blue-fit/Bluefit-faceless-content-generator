@@ -8,13 +8,23 @@ the same key from the environment separately.
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Awaitable, Callable
 from functools import lru_cache
+from typing import TypeVar
 
+import structlog
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError
 
 from app.config import get_settings
 from app.tools import ToolError
+
+logger = structlog.get_logger(__name__)
+
+_TRANSIENT_CODES = {429, 500, 503}
+_T = TypeVar("_T")
 
 # Canonical model IDs — referenced by tools, agents, and meter/pricing.py.
 MODEL_FLASH = "gemini-2.5-flash"
@@ -35,6 +45,35 @@ def get_genai_client() -> genai.Client:
             "project/location settings before enabling it."
         )
     return genai.Client(api_key=settings.google_api_key.get_secret_value())
+
+
+async def with_retry(call: Callable[[], Awaitable[_T]], *, attempts: int = 5) -> _T:
+    """Retry a google-genai call on transient errors (429/500/503) with backoff.
+
+    Google's models periodically return 503 "high demand"; the SDK's built-in
+    retry gives up too quickly for a sustained spike. This makes a single
+    transient blip self-heal instead of failing the user-facing call.
+    """
+    delay = 4.0
+    for attempt in range(1, attempts + 1):
+        try:
+            return await call()
+        except APIError as exc:
+            code = getattr(exc, "code", None)
+            if code in _TRANSIENT_CODES and attempt < attempts:
+                logger.warning("genai.transient_retry", attempt=attempt, code=code, wait_s=delay)
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 30.0)
+                continue
+            raise
+    raise RuntimeError("unreachable")  # pragma: no cover
+
+
+async def generate_text(model: str, contents: str) -> types.GenerateContentResponse:
+    """Single-shot text generation with transient-error retry (for tools)."""
+    return await with_retry(
+        lambda: get_genai_client().aio.models.generate_content(model=model, contents=contents)
+    )
 
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:
