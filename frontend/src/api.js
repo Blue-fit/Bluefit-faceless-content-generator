@@ -1,3 +1,4 @@
+// API base + bearer token come from Vercel env (VITE_API_URL / VITE_API_TOKEN).
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 const TOKEN = import.meta.env.VITE_API_TOKEN ?? ''
 
