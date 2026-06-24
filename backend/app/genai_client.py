@@ -69,11 +69,30 @@ async def with_retry(call: Callable[[], Awaitable[_T]], *, attempts: int = 5) ->
     raise RuntimeError("unreachable")  # pragma: no cover
 
 
-async def generate_text(model: str, contents: str) -> types.GenerateContentResponse:
-    """Single-shot text generation with transient-error retry (for tools)."""
-    return await with_retry(
-        lambda: get_genai_client().aio.models.generate_content(model=model, contents=contents)
-    )
+async def generate_text(
+    model: str, contents: str, *, fallback_model: str | None = None
+) -> types.GenerateContentResponse:
+    """Single-shot text generation with transient-error retry + optional model fallback.
+
+    Tries `model` (retrying 503/429/500); if it still fails transiently and a
+    `fallback_model` is given, retries on that model. Lets a user-facing call
+    survive one model being overloaded while the other is up.
+    """
+    try:
+        return await with_retry(
+            lambda: get_genai_client().aio.models.generate_content(model=model, contents=contents),
+            attempts=3,
+        )
+    except APIError as exc:
+        if fallback_model and getattr(exc, "code", None) in _TRANSIENT_CODES:
+            logger.warning("genai.model_fallback", from_model=model, to=fallback_model)
+            return await with_retry(
+                lambda: get_genai_client().aio.models.generate_content(
+                    model=fallback_model, contents=contents
+                ),
+                attempts=3,
+            )
+        raise
 
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:

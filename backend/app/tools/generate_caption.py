@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from app.genai_client import MODEL_FLASH, generate_text
+from app.genai_client import MODEL_FLASH, MODEL_PRO, generate_text
 from app.meter import MeteredResult, MeterRequest, meter, pricing
 from app.tools import ToolError
 
@@ -47,7 +47,7 @@ async def generate_caption(req: CaptionRequest) -> CaptionResult:
     )
     contents = "\n".join(parts)
 
-    response = await generate_text(MODEL_FLASH, contents)
+    response = await generate_text(MODEL_FLASH, contents, fallback_model=MODEL_PRO)
     caption = (response.text or "").strip()
     if not caption:
         raise ToolError("generate_caption: Flash returned no text.")

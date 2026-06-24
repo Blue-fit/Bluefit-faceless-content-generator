@@ -27,7 +27,7 @@ from app.db.repositories.post_versions import (
 )
 from app.db.repositories.posts import get_post, get_posts_for_week, set_current_version
 from app.db.repositories.weeks import list_weeks
-from app.genai_client import MODEL_FLASH, generate_text
+from app.genai_client import MODEL_FLASH, MODEL_PRO, generate_text
 from app.meter import MeteredResult, MeterRequest, meter, pricing
 from app.storage import AssetUploader
 from app.tools import ToolError
@@ -161,7 +161,7 @@ class _ClassifyResult(MeteredResult):
 
 @meter("edit")
 async def _classify(req: _ClassifyRequest) -> _ClassifyResult:
-    response = await generate_text(MODEL_FLASH, req.text)
+    response = await generate_text(MODEL_FLASH, req.text, fallback_model=MODEL_PRO)
     raw = (response.text or "").strip()
     if raw.startswith("```"):
         raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
