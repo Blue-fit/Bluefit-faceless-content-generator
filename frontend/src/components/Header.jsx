@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import logo from '@brand/Logo.png'
 import { useData } from '../context/DataContext'
+import { clearToken } from '../api'
 import styles from './Header.module.css'
 
 export default function Header({ monthLabel, weekLabel }) {
@@ -19,6 +20,11 @@ export default function Header({ monthLabel, weekLabel }) {
     } else {
       navigate('/')
     }
+  }
+
+  function handleLogout() {
+    clearToken()
+    navigate('/login', { replace: true })
   }
 
   const rightLabel = isWeekPage && weekLabel
@@ -51,6 +57,12 @@ export default function Header({ monthLabel, weekLabel }) {
           <span className={isWeekPage || isMonthPage ? styles.crumb : styles.meta}>
             {rightLabel}
           </span>
+          <button
+            onClick={handleLogout}
+            style={{ marginLeft: 18, background: 'none', border: 'none', color: '#1e6eb4', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+          >
+            Sign out
+          </button>
         </div>
       </div>
     </header>

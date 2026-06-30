@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 
 from app.agents.pipeline import run_weekly
 from app.db.connection import close_pool, create_pool
+from app.notifications.email import send_weekly_digest
 from app.storage.r2 import R2Uploader
 
 log = structlog.get_logger()
@@ -37,6 +38,11 @@ async def main() -> int:
             posts=len(result.post_ids),
             cost_eur=result.cost_eur,
         )
+        if result.status == "ready":
+            await send_weekly_digest(
+                week_label=f"Week of {week_start.strftime('%B')} {week_start.day}",
+                n_posts=len(result.post_ids),
+            )
         return 0 if result.status == "ready" else 1
     finally:
         await close_pool()

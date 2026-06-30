@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.db.connection import close_pool, create_pool
+from app.routes.auth import router as auth_router
 from app.routes.chat import router as chat_router
 from app.routes.download import router as download_router
 from app.routes.explain import router as explain_router
@@ -33,6 +34,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(health_router)
 app.include_router(posts_router)
 app.include_router(chat_router)

@@ -45,11 +45,17 @@ class Settings(BaseSettings):
     client_email: str = ""
     operator_email: str = ""
 
+    # --- Frontend / app ---
+    frontend_url: str = "https://bluefit-faceless-content-generator.vercel.app"
+
     # --- Postgres (asyncpg DSN) ---
     database_url: str
 
     # --- App auth ---
     auth_bearer_token: SecretStr
+    # Simple username/password login (set these yourself in the environment).
+    auth_username: str = ""
+    auth_password: SecretStr = SecretStr("")
 
     # --- Cost governance ---
     spend_cap_eur: Decimal = Decimal("100.00")
