@@ -114,13 +114,50 @@ async def _run_agent(agent: LlmAgent, message: str, session_id: str) -> str:
     return final
 
 
+# Coarse visual "setting" families — used to stop the same scene (e.g. ocean
+# swimming) recurring week over week. Keyword match against the scene_prompt.
+_SCENE_FAMILIES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("water", ("ocean", "beach", "swim", "water", "pool", "wave", "surf",
+               "coast", "shore", "lake", "river", "seaside", "underwater")),
+    ("gym", ("gym", "weight", "dumbbell", "barbell", "treadmill", "fitness",
+             "sportschool", "yoga studio")),
+    ("kitchen", ("kitchen", "cook", "meal", "food", "plate", "salad", "keuken")),
+    ("home", ("home", "living room", "bedroom", "couch", "sofa", "indoor", "desk")),
+    ("nature", ("forest", "park", "trail", "mountain", "hik", "garden", "field",
+                "woods", "meadow", "hill", "trees")),
+    ("urban", ("city", "street", "urban", "rooftop", "cafe", "market", "plaza")),
+)
+
+
+def _scene_family(scene: str | None) -> str:
+    """Map a scene_prompt to a coarse setting family (or 'other' if unrecognised)."""
+    s = (scene or "").lower()
+    for family, keys in _SCENE_FAMILIES:
+        if any(k in s for k in keys):
+            return family
+    return "other"
+
+
+def _recent_scene_families(recent: list[RecentPost]) -> set[str]:
+    """The identifiable setting families used by recent posts (excludes 'other')."""
+    fams = {_scene_family(p.scene_prompt) for p in recent}
+    fams.discard("other")
+    return fams
+
+
 def _recent_block(recent: list[RecentPost]) -> str:
     if not recent:
         return "(none yet — first week)"
-    return "\n".join(
-        f"- {p.pillar} | theme: {p.theme} | value: {p.value} | hook: {p.hook}"
-        for p in recent
-    )
+    lines: list[str] = []
+    for p in recent:
+        scene = (p.scene_prompt or "").strip().replace("\n", " ")
+        if len(scene) > 140:
+            scene = scene[:140] + "…"
+        line = f"- {p.pillar} | theme: {p.theme} | value: {p.value} | hook: {p.hook}"
+        if scene:
+            line += f" | scene: {scene}"
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def _generator_message(
@@ -128,13 +165,24 @@ def _generator_message(
 ) -> str:
     brand = "\n\n---\n\n".join(brand_chunks) if brand_chunks else "(none retrieved)"
     rules = "\n".join(f"- {t}" for t in rule_texts) if rule_texts else "(none)"
+    avoid = sorted(_recent_scene_families(recent))
+    avoid_line = (
+        f"Recently used visual settings — do NOT reuse these: {', '.join(avoid)}. "
+        if avoid
+        else ""
+    )
     return (
         f"## This week's themes (from the researcher)\n{themes}\n\n"
         f"## Brand context (retrieved from the requirements doc)\n{brand}\n\n"
         f"## Active rules\n{rules}\n\n"
         f"## Recently covered (make this week DIFFERENT)\n{_recent_block(recent)}\n\n"
         "Produce the 3 PostSpecs now (2 image, 1 video, distinct pillars). "
-        "Make them clearly different from the recently covered posts above."
+        "Make them clearly different from the recently covered posts above. "
+        f"{avoid_line}"
+        "Give each post a DISTINCT visual setting, and do NOT default to water/ocean "
+        "scenes just because the brand is 'Blue' — vary the setting (park, gym, home, "
+        "kitchen, city, forest, studio, market, ...). The video in particular MUST use "
+        "a setting not seen in the recent posts above."
     )
 
 
@@ -214,6 +262,50 @@ async def _render(spec: PostSpec, post_id: UUID) -> _Asset:
     return _Asset(data, vid.model, vid.cost_eur, ".mp4", vid.mime_type or "video/mp4")
 
 
+async def _enforce_scene_variety(
+    out: GeneratorOutput,
+    recent_families: set[str],
+    base_message: str,
+    week_start: date,
+) -> GeneratorOutput:
+    """Re-prompt once if the video reuses a recent visual setting (e.g. ocean).
+
+    The video is the worst repeat offender, so we hard-guard it: if its setting
+    family was used in the recent posts, we ask the generator to redo all 3 with a
+    different video setting. Runs before any rendering, so no asset spend is wasted.
+    Best-effort — if the correction call fails we keep the original output; variety
+    never blocks a weekly run.
+    """
+    video = next((p for p in out.posts if p.type == "video"), None)
+    if video is None:
+        return out
+    family = _scene_family(video.scene_prompt)
+    if family == "other" or family not in recent_families:
+        return out
+
+    logger.info("pipeline.scene_repeat", family=family, scene=video.scene_prompt[:80])
+    banned = ", ".join(sorted(recent_families | {family}))
+    correction = (
+        f"{base_message}\n\n## CORRECTION\nThe VIDEO you produced uses a '{family}' "
+        "setting, which was used in the recent posts above. Regenerate all 3 posts; "
+        "the video MUST use a completely different setting — do NOT use any of: "
+        f"{banned}."
+    )
+    try:
+        retried = GeneratorOutput.model_validate_json(
+            _strip(await _run_agent(build_generator(), correction, f"wk-{week_start}-g2"))
+        )
+    except Exception:  # noqa: BLE001 — variety retry is best-effort, never fatal
+        logger.warning("pipeline.scene_repeat_retry_failed", family=family)
+        return out
+    new_video = next((p for p in retried.posts if p.type == "video"), None)
+    if new_video is None:
+        return out
+    if _scene_family(new_video.scene_prompt) in recent_families:
+        logger.warning("pipeline.scene_repeat_unresolved", family=family)
+    return retried
+
+
 # ---- entry point ------------------------------------------------------------
 
 
@@ -265,6 +357,9 @@ async def run_weekly(week_start: date, *, uploader: AssetUploader) -> WeekResult
     )
     out = GeneratorOutput.model_validate_json(
         _strip(await _run_agent(build_generator(), message, f"wk-{week_start}-g"))
+    )
+    out = await _enforce_scene_variety(
+        out, _recent_scene_families(recent.versions), message, week_start
     )
 
     # 4. render images first, video last; isolate each post so one failure survives

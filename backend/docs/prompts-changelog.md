@@ -1,5 +1,14 @@
 # Prompts changelog
 
+## 2026-07-13
+- `agents/prompts/generator.md` — added a **"Vary the visual setting"** rule. The
+  `recently covered` block now surfaces each past post's `scene`, and the generator
+  must not default to water/ocean scenes ("Blue" ≠ ocean) — each post gets a distinct
+  setting and the video must use a setting not seen recently (a repeat is rejected by
+  the pipeline's `_enforce_scene_variety` guard). Reason: videos were repeating the
+  same ocean-swimming scene every week because the diversification memory only tracked
+  concepts (pillar/theme/value/hook), never the visual scene.
+
 ## 2026-06-22
 - `agents/prompts/learning_extract.md` — created. Gemini Flash prompt for the Phase-2
   learning loop: distills the last 14 days of edit instructions into durable brand

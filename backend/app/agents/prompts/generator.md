@@ -31,6 +31,13 @@ ideas, or hooks. Rotate the pillars too: prefer pillars and angles that were
 week-over-week is a hard requirement; if a theme overlaps something recent, pick a
 different value or a clearly different visual angle on it.
 
+**Vary the visual setting.** The `recently covered` list includes each post's
+`scene` — treat those settings as used-up. Do **not** default to water/ocean
+scenes just because the brand is "Blue"; rotate through varied settings (park,
+gym, home, kitchen, city, forest, studio, market, rooftop, ...). Give each of the
+3 posts a **distinct** setting, and the **video** in particular must use a setting
+**not seen** in the recent posts — a repeated video setting will be rejected.
+
 For each post, produce a `PostSpec`:
 - `pillar` — one of the four pillars.
 - `type` — `"image"` or `"video"` (exactly two images and one video overall).

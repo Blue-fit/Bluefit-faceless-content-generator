@@ -27,6 +27,7 @@ class RecentPost(BaseModel):
     theme: str | None
     value: str | None
     hook: str | None
+    scene_prompt: str | None
     caption: str | None
     asset_url: str | None
 
@@ -49,6 +50,7 @@ def _project(version: PostVersion) -> RecentPost:
         theme=blob.get("theme"),
         value=blob.get("value"),
         hook=blob.get("hook"),
+        scene_prompt=blob.get("scene_prompt"),
         caption=version.caption,
         asset_url=version.asset_url,
     )
