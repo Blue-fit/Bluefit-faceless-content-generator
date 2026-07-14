@@ -65,7 +65,12 @@ For each post, produce a `PostSpec`:
 - `caption` — an **in-depth** Instagram caption (3–5 sentences) in Blue Fit's voice,
   matching the template: open with a hook line, deliver real substance tied to the
   post's value (a concrete insight, not platitudes), and close with a question or
-  prompt that invites comments.
+  prompt that invites comments. Use the post's **searchable Dutch keywords naturally
+  in the prose** (Instagram search reads the caption), then end with a short
+  **discovery line** of 3–6 natural search terms tied to the pillar/theme/value,
+  separated by " · " (e.g. `hydratatie · natuurlijk bewegen · wellness routine ·
+  Blue Zones`). Keep it understated and on-brand — real terms a reader would search,
+  never a spammy hashtag wall.
 - `references_used` — `{ theme, value, brand_cues, rule_applied }`: the theme
   title, the **one Power-9 value** the post embodies (if it's value-led), the brand
   cues you leaned on, and any rule applied (or null). **Never leave this empty** —

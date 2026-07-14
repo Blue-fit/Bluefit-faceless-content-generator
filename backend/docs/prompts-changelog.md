@@ -13,6 +13,10 @@
   pillar/theme/value, while staying a punchy curiosity-gap oneliner. Reason: improve
   Instagram discoverability ("SEO") — the burned-in on-screen text is searched/OCR'd,
   so the hook doubles as a search surface. Applies to all posts (image + video).
+- `agents/prompts/generator.md` — the **caption** now uses the post's searchable Dutch
+  keywords naturally in the prose and ends with a short discovery line (3–6 keywords,
+  " · " separated). Reason: belt-and-suspenders Instagram SEO — the caption is the
+  primary text Instagram search indexes, complementing the on-screen hook keyword.
 
 ## 2026-06-22
 - `agents/prompts/learning_extract.md` — created. Gemini Flash prompt for the Phase-2
