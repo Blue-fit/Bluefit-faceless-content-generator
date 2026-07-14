@@ -14,6 +14,7 @@ from typing import Literal, cast, get_args
 from uuid import UUID
 
 import asyncpg
+import httpx
 import structlog
 from pydantic import BaseModel
 
@@ -192,8 +193,12 @@ async def _render_asset(
     hook: str | None,
     post_id: UUID,
     scale: float = 1.0,
-) -> tuple[bytes, str, str, Decimal]:
-    """Re-render an edited asset (metered) and burn in its hook at `scale` text size."""
+) -> tuple[bytes, bytes, str, str, Decimal]:
+    """Re-render an edited asset (metered), burn in its hook at `scale`.
+
+    Returns (composited, base, ext, content_type, cost). The base is the
+    pre-overlay original — stored so later text-size edits can keep the image.
+    """
     if post_type == "image":
         img = await generate_image(
             ImageRequest(
@@ -204,12 +209,9 @@ async def _render_asset(
             )
         )
         ext = ".jpg" if "jpeg" in img.mime_type else ".png"
-        data = (
-            await overlay_hook_image(img.image_bytes, hook, ext, scale=scale)
-            if hook
-            else img.image_bytes
-        )
-        return data, ext, img.mime_type, img.cost_eur
+        base = img.image_bytes
+        data = await overlay_hook_image(base, hook, ext, scale=scale) if hook else base
+        return data, base, ext, img.mime_type, img.cost_eur
 
     vid = await generate_video(
         VideoRequest(
@@ -220,8 +222,43 @@ async def _render_asset(
             post_id=post_id,
         )
     )
-    data = await overlay_hook(vid.video_bytes, hook, scale=scale) if hook else vid.video_bytes
-    return data, ".mp4", vid.mime_type or "video/mp4", vid.cost_eur
+    base = vid.video_bytes
+    data = await overlay_hook(base, hook, scale=scale) if hook else base
+    return data, base, ".mp4", vid.mime_type or "video/mp4", vid.cost_eur
+
+
+def _ext_ctype(url: str) -> tuple[str, str]:
+    """Infer (ext, content_type) from a stored asset URL's suffix."""
+    if url.endswith((".jpg", ".jpeg")):
+        return ".jpg", "image/jpeg"
+    if url.endswith(".png"):
+        return ".png", "image/png"
+    return ".mp4", "video/mp4"
+
+
+async def _fetch_bytes(url: str) -> bytes:
+    """Download a stored asset (the public R2 URL) for in-place re-overlay."""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        return resp.content
+
+
+async def _reoverlay_from_base(
+    base_url: str, post_type: str, hook: str | None, scale: float
+) -> tuple[bytes, str, str]:
+    """Re-apply the hook overlay to the stored base at a new text size.
+
+    Keeps the exact image — no regeneration, no generation cost. Returns
+    (composited_bytes, ext, content_type).
+    """
+    raw = await _fetch_bytes(base_url)
+    ext, ctype = _ext_ctype(base_url)
+    if not hook:
+        return raw, ext, ctype
+    if post_type == "image":
+        return await overlay_hook_image(raw, hook, ext, scale=scale), ext, ctype
+    return await overlay_hook(raw, hook, scale=scale), ext, ctype
 
 
 async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
@@ -294,17 +331,39 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         text_scale = float(blob.get("text_scale") or 1.0)
         if plan.text_scale:
             text_scale = min(2.0, max(0.4, text_scale * plan.text_scale))
-        data, ext, ctype, asset_cost = await _render_asset(
-            post.type, scene, blob.get("motion"), blob.get("hook"), req.post_id,
-            scale=text_scale,
-        )
-        cost += asset_cost
+
+        base_url: str | None = blob.get("base_asset_url")
+        text_only = bool(plan.text_scale) and plan.new_scene_prompt is None
+        v_next = current.version_number + 1
+        if text_only and base_url:
+            # Keep the exact image: re-overlay the stored base at the new text size
+            # (no regeneration, no generation cost).
+            data, ext, ctype = await _reoverlay_from_base(
+                base_url, post.type, blob.get("hook"), text_scale
+            )
+        else:
+            # Regenerate the asset and store its base so future text edits keep it.
+            data, base, ext, ctype, asset_cost = await _render_asset(
+                post.type, scene, blob.get("motion"), blob.get("hook"), req.post_id,
+                scale=text_scale,
+            )
+            cost += asset_cost
+            base_url = await uploader.upload(
+                data=base,
+                key=f"edits/{req.post_id}/v{v_next}-base{ext}",
+                content_type=ctype,
+            )
         new_asset_url = await uploader.upload(
             data=data,
-            key=f"edits/{req.post_id}/v{current.version_number + 1}{ext}",
+            key=f"edits/{req.post_id}/v{v_next}{ext}",
             content_type=ctype,
         )
-        blob = {**blob, "scene_prompt": scene, "text_scale": text_scale}
+        blob = {
+            **blob,
+            "scene_prompt": scene,
+            "text_scale": text_scale,
+            "base_asset_url": base_url,
+        }
 
     new_blob = {
         **blob,

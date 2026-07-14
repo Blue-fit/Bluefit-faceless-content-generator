@@ -194,7 +194,11 @@ def _prompt_version() -> str:
 
 
 def _reasoning_blob(
-    spec: PostSpec, brand_chunk_ids: list[UUID], rule_ids: list[UUID], asset_model: str
+    spec: PostSpec,
+    brand_chunk_ids: list[UUID],
+    rule_ids: list[UUID],
+    asset_model: str,
+    base_asset_url: str,
 ) -> dict:
     r = spec.references_used
     return {
@@ -204,6 +208,7 @@ def _reasoning_blob(
         "value": r.value,
         "hook": spec.hook,
         "scene_prompt": spec.scene_prompt,
+        "base_asset_url": base_asset_url,
         "motion": spec.motion,
         "caption": spec.caption,
         "brand_cues": r.brand_cues,
@@ -223,7 +228,8 @@ def _reason_text(spec: PostSpec) -> str:
 
 @dataclass
 class _Asset:
-    data: bytes
+    data: bytes  # composited (hook burned in)
+    base: bytes  # pre-overlay original — stored so text-size edits keep the image
     model: str
     cost_eur: Decimal
     ext: str
@@ -231,7 +237,7 @@ class _Asset:
 
 
 async def _render(spec: PostSpec, post_id: UUID) -> _Asset:
-    """Render one PostSpec (metered) and burn in its hook."""
+    """Render one PostSpec (metered) and burn in its hook; keep the pre-overlay base."""
     if spec.type == "image":
         res = await generate_image(
             ImageRequest(
@@ -242,12 +248,9 @@ async def _render(spec: PostSpec, post_id: UUID) -> _Asset:
             )
         )
         ext = ".jpg" if "jpeg" in res.mime_type else ".png"
-        data = (
-            await overlay_hook_image(res.image_bytes, spec.hook, ext)
-            if spec.hook
-            else res.image_bytes
-        )
-        return _Asset(data, res.model, res.cost_eur, ext, res.mime_type)
+        base = res.image_bytes
+        data = await overlay_hook_image(base, spec.hook, ext) if spec.hook else base
+        return _Asset(data, base, res.model, res.cost_eur, ext, res.mime_type)
 
     vid = await generate_video(
         VideoRequest(
@@ -258,8 +261,9 @@ async def _render(spec: PostSpec, post_id: UUID) -> _Asset:
             post_id=post_id,
         )
     )
-    data = await overlay_hook(vid.video_bytes, spec.hook) if spec.hook else vid.video_bytes
-    return _Asset(data, vid.model, vid.cost_eur, ".mp4", vid.mime_type or "video/mp4")
+    base = vid.video_bytes
+    data = await overlay_hook(base, spec.hook) if spec.hook else base
+    return _Asset(data, base, vid.model, vid.cost_eur, ".mp4", vid.mime_type or "video/mp4")
 
 
 async def _enforce_scene_variety(
@@ -374,12 +378,17 @@ async def run_weekly(week_start: date, *, uploader: AssetUploader) -> WeekResult
                 )
             asset = await _render(spec, post.id)
             total += asset.cost_eur
+            base_url = await uploader.upload(
+                data=asset.base,
+                key=f"weeks/{week_start}/{post.id}-base{asset.ext}",
+                content_type=asset.content_type,
+            )
             url = await uploader.upload(
                 data=asset.data,
                 key=f"weeks/{week_start}/{post.id}{asset.ext}",
                 content_type=asset.content_type,
             )
-            blob = _reasoning_blob(spec, brand.chunk_ids, rule_ids, asset.model)
+            blob = _reasoning_blob(spec, brand.chunk_ids, rule_ids, asset.model, base_url)
             reason = await _embed_reasoning(
                 _ReasonEmbedRequest(
                     text=_reason_text(spec), trigger="cron", post_id=post.id
