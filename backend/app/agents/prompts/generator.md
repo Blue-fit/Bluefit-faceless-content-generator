@@ -52,8 +52,14 @@ For each post, produce a `PostSpec`:
 - `hook` — **every post** (image and video): a short scroll-stopping oneliner
   (≤8 words) burned onto the asset that opens a **curiosity gap the caption then
   pays off** — tease the caption's core insight without revealing it, so the
-  viewer has to read on. Keep it on-brand: a calm, strong statement or something
-  to think about (never hype or "no excuses"). Never null.
+  viewer has to read on. **Weave in one searchable Instagram keyword**: a natural
+  Dutch search term the wellness audience would actually type (e.g. *hydratatie*,
+  *natuurlijk bewegen*, *wellness routine*, *gezond eten*, *Blue Zones*), tied to
+  this post's pillar/theme/value, so the on-screen text doubles as discovery
+  ("Instagram SEO"). Weave it in **naturally**: it must read as part of the hook,
+  never a keyword list or a stuffed tag, and must not kill the curiosity gap. Keep it
+  on-brand: a calm, strong statement or something to think about (never hype or
+  "no excuses"). Example: *Hydratatie: de stille kracht van water*. Never null.
 - `caption_template` — `"question"`, `"hottake"`, or `"observation"`; pick what
   best sparks comments for that post.
 - `caption` — an **in-depth** Instagram caption (3–5 sentences) in Blue Fit's voice,

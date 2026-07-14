@@ -8,6 +8,11 @@
   the pipeline's `_enforce_scene_variety` guard). Reason: videos were repeating the
   same ocean-swimming scene every week because the diversification memory only tracked
   concepts (pillar/theme/value/hook), never the visual scene.
+- `agents/prompts/generator.md` — the **hook** now weaves in one searchable Dutch
+  Instagram keyword (e.g. "hydratatie", "natuurlijk bewegen"), tied to the post's
+  pillar/theme/value, while staying a punchy curiosity-gap oneliner. Reason: improve
+  Instagram discoverability ("SEO") — the burned-in on-screen text is searched/OCR'd,
+  so the hook doubles as a search surface. Applies to all posts (image + video).
 
 ## 2026-06-22
 - `agents/prompts/learning_extract.md` — created. Gemini Flash prompt for the Phase-2
