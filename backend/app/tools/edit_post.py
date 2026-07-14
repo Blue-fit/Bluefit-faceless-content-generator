@@ -52,6 +52,7 @@ class EditPlan(BaseModel):
     new_scene_prompt: str | None = None
     caption_template: Template | None = None
     caption_instruction: str | None = None
+    text_scale: float | None = None
 
 
 class EditRequest(BaseModel):
@@ -81,6 +82,11 @@ Decide:
 - For an asset tweak/rewrite, set "new_scene_prompt" to the full updated scene
   description (faceless; subject/action/setting/mood only, no style words). For
   "regenerate" leave it null.
+- If the request is only to resize the on-image HOOK TEXT (e.g. "make the text
+  smaller/bigger", "kleiner/groter maken"), set "text_scale" to a multiplier
+  RELATIVE to the current text: 0.8 = a bit smaller, 0.65 = much smaller, 1.25 =
+  bigger. Use target "asset", mode "tweak", and leave "new_scene_prompt" null so
+  the scene is kept. Otherwise "text_scale" is null.
 - For a caption edit, set "caption_instruction" to a concise directive; set
   "caption_template" only if the engagement style should change
   (question|hottake|observation), else null.
@@ -90,7 +96,7 @@ Decide:
   adapted to THIS post's pillar — do not copy their subject verbatim.
 
 Return exactly the keys:
-{"target","mode","new_scene_prompt","caption_template","caption_instruction"}"""
+{"target","mode","new_scene_prompt","caption_template","caption_instruction","text_scale"}"""
 
 
 # ---- "make this like week N" reference resolution ---------------------------
@@ -180,9 +186,14 @@ async def _classify(req: _ClassifyRequest) -> _ClassifyResult:
 
 
 async def _render_asset(
-    post_type: str, scene: str, motion: str | None, hook: str | None, post_id: UUID
+    post_type: str,
+    scene: str,
+    motion: str | None,
+    hook: str | None,
+    post_id: UUID,
+    scale: float = 1.0,
 ) -> tuple[bytes, str, str, Decimal]:
-    """Re-render an edited asset (metered) and burn in its hook. Returns bytes+meta."""
+    """Re-render an edited asset (metered) and burn in its hook at `scale` text size."""
     if post_type == "image":
         img = await generate_image(
             ImageRequest(
@@ -194,7 +205,7 @@ async def _render_asset(
         )
         ext = ".jpg" if "jpeg" in img.mime_type else ".png"
         data = (
-            await overlay_hook_image(img.image_bytes, hook, ext)
+            await overlay_hook_image(img.image_bytes, hook, ext, scale=scale)
             if hook
             else img.image_bytes
         )
@@ -209,7 +220,7 @@ async def _render_asset(
             post_id=post_id,
         )
     )
-    data = await overlay_hook(vid.video_bytes, hook) if hook else vid.video_bytes
+    data = await overlay_hook(vid.video_bytes, hook, scale=scale) if hook else vid.video_bytes
     return data, ".mp4", vid.mime_type or "video/mp4", vid.cost_eur
 
 
@@ -278,8 +289,14 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         scene = plan.new_scene_prompt or blob.get("scene_prompt")
         if not scene:
             raise EditError("no scene_prompt available to edit this asset.")
+        # Text size is relative to the current asset's; compound + clamp so repeated
+        # "smaller" keeps shrinking within sane bounds.
+        text_scale = float(blob.get("text_scale") or 1.0)
+        if plan.text_scale:
+            text_scale = min(2.0, max(0.4, text_scale * plan.text_scale))
         data, ext, ctype, asset_cost = await _render_asset(
-            post.type, scene, blob.get("motion"), blob.get("hook"), req.post_id
+            post.type, scene, blob.get("motion"), blob.get("hook"), req.post_id,
+            scale=text_scale,
         )
         cost += asset_cost
         new_asset_url = await uploader.upload(
@@ -287,7 +304,7 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
             key=f"edits/{req.post_id}/v{current.version_number + 1}{ext}",
             content_type=ctype,
         )
-        blob = {**blob, "scene_prompt": scene}
+        blob = {**blob, "scene_prompt": scene, "text_scale": text_scale}
 
     new_blob = {
         **blob,

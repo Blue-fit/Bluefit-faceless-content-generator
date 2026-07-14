@@ -61,7 +61,7 @@ def _draw_hook(
 ) -> None:
     """Draw `text` centred horizontally at `y_frac` of image height."""
     lines = text.split("\n")
-    line_h = font.size + line_spacing
+    line_h = int(font.size) + line_spacing
     total_h = line_h * len(lines) - line_spacing
     y = int(img_h * y_frac - total_h / 2)
 
@@ -81,10 +81,10 @@ def _draw_hook(
 
 
 def _render_overlay_png(
-    width: int, height: int, hook: str, y_frac: float
+    width: int, height: int, hook: str, y_frac: float, scale: float = 1.0
 ) -> bytes:
     """Return a transparent RGBA PNG with the hook text drawn on it."""
-    font_size = max(20, height // 20)
+    font_size = max(14, int((height // 20) * scale))
     font = _load_font(font_size)
     canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
@@ -94,10 +94,15 @@ def _render_overlay_png(
     return buf.getvalue()
 
 
-async def overlay_hook_image(image_bytes: bytes, hook: str, ext: str = ".jpg") -> bytes:
-    """Return the still with `hook` burned in centred (Montserrat, white)."""
+async def overlay_hook_image(
+    image_bytes: bytes, hook: str, ext: str = ".jpg", scale: float = 1.0
+) -> bytes:
+    """Return the still with `hook` burned in centred (Montserrat, white).
+
+    `scale` multiplies the auto-computed font size (1.0 = default; <1 smaller).
+    """
     img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
-    font_size = max(20, img.height // 20)
+    font_size = max(14, int((img.height // 20) * scale))
     font = _load_font(font_size)
 
     overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
@@ -113,11 +118,12 @@ async def overlay_hook_image(image_bytes: bytes, hook: str, ext: str = ".jpg") -
     return buf.getvalue()
 
 
-async def overlay_hook(video_bytes: bytes, hook: str) -> bytes:
+async def overlay_hook(video_bytes: bytes, hook: str, scale: float = 1.0) -> bytes:
     """Return the clip with `hook` burned in (Montserrat, white, upper third, full clip).
 
     Uses Pillow to render the text as a transparent PNG overlay, then ffmpeg
-    `overlay` to composite it — no libfreetype / drawtext needed.
+    `overlay` to composite it — no libfreetype / drawtext needed. `scale`
+    multiplies the auto-computed font size (1.0 = default; <1 smaller).
     """
     # Probe the video dimensions first so the overlay PNG matches.
     with tempfile.TemporaryDirectory() as tmp:
@@ -142,7 +148,7 @@ async def overlay_hook(video_bytes: bytes, hook: str) -> bytes:
         except ValueError:
             w, h = 720, 1280  # fallback for 9:16
 
-        overlay_png = _render_overlay_png(w, h, hook, y_frac=0.22)
+        overlay_png = _render_overlay_png(w, h, hook, y_frac=0.22, scale=scale)
         (d / "overlay.png").write_bytes(overlay_png)
 
         # Composite: show the hook for the entire clip

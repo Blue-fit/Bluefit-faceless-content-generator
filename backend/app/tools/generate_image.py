@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from google.genai import types
 
-from app.genai_client import MODEL_IMAGE, get_genai_client
+from app.genai_client import MODEL_IMAGE, get_genai_client, with_retry
 from app.meter import MeteredResult, MeterRequest, meter, pricing
 from app.tools import ToolError
 
@@ -35,8 +35,10 @@ async def render_image(prompt: str, aspect_ratio: str = "9:16") -> ImageResult:
         response_modalities=["IMAGE"],
         image_config=types.ImageConfig(aspect_ratio=aspect_ratio),
     )
-    response = await client.aio.models.generate_content(
-        model=MODEL_IMAGE, contents=prompt, config=config
+    response = await with_retry(
+        lambda: client.aio.models.generate_content(
+            model=MODEL_IMAGE, contents=prompt, config=config
+        )
     )
     if not response.candidates:
         raise ToolError("Image model returned no candidates.")

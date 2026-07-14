@@ -18,7 +18,7 @@ import asyncio
 
 from google.genai import types
 
-from app.genai_client import MODEL_VIDEO, get_genai_client
+from app.genai_client import MODEL_VIDEO, get_genai_client, with_retry
 from app.meter import MeteredResult, MeterRequest, meter, pricing
 from app.tools import ToolError
 
@@ -52,8 +52,10 @@ async def render_video(
         duration_seconds=duration_seconds,
         aspect_ratio=aspect_ratio,
     )
-    operation = await client.aio.models.generate_videos(
-        model=MODEL_VIDEO, prompt=prompt, config=config
+    operation = await with_retry(
+        lambda: client.aio.models.generate_videos(
+            model=MODEL_VIDEO, prompt=prompt, config=config
+        )
     )
     waited = 0
     while not operation.done:
