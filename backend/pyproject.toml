@@ -12,8 +12,8 @@ dependencies = [
     # Scheduling
     "apscheduler>=3.11",
     # Google AI
-    "google-genai>=1.16",
-    "google-adk>=1.2",
+    "google-genai>=2.12",
+    "google-adk>=2.7",
     # Storage & email
     "boto3>=1.38",
     "resend>=2.10",
