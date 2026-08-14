@@ -22,7 +22,7 @@ _PER_MILLION_TOKENS: dict[str, tuple[Decimal, Decimal]] = {
 
 # Flat per-asset costs.
 _PER_IMAGE = Decimal("0.039")  # Nano Banana, per image
-_PER_VIDEO_SECOND = Decimal("0.15")  # Veo 3.1 Fast, per second of output
+_PER_VIDEO_SECOND = Decimal("0.10")  # Veo 3.1 Fast, per second of 720p output (Google list price)
 
 _MILLION = Decimal(1_000_000)
 

@@ -24,7 +24,7 @@ def test_image_cost_is_flat() -> None:
 
 
 def test_video_cost_scales_with_seconds() -> None:
-    assert pricing.video_cost(8) == Decimal("0.15") * 8
+    assert pricing.video_cost(8) == Decimal("0.10") * 8
 
 
 def test_unknown_model_raises() -> None:
