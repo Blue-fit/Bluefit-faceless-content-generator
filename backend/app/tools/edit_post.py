@@ -51,6 +51,7 @@ class EditPlan(BaseModel):
     target: Literal["asset", "caption"]
     mode: Literal["tweak", "regenerate", "rewrite"]
     new_scene_prompt: str | None = None
+    new_hook: str | None = None
     caption_template: Template | None = None
     caption_instruction: str | None = None
     text_scale: float | None = None
@@ -76,13 +77,25 @@ _CLASSIFY = """You classify a free-text edit request for a Blue Fit social post 
 return STRICT JSON only — no prose, no code fences.
 
 Decide:
-- "target": "asset" if the change is about the image/video itself; "caption" if it
-  is about the written caption.
+- "target": "asset" if the change is about the image/video itself OR the ON-SCREEN
+  text overlaid on it — the "hook" burned into the media (e.g. "the text in the
+  video", "de tekst in de video", "de tekst op de foto", "the words on screen",
+  "change the on-screen text"). Use "caption" ONLY for the written caption /
+  description shown BENEATH the post. Rule of thumb: text that is IN / ON the
+  video or image is the ASSET hook, not the caption — when in doubt, choose "asset".
 - "mode": "tweak" (small change to the same concept), "regenerate" (same concept,
   a fresh take), or "rewrite" (a meaningfully different concept).
-- For an asset tweak/rewrite, set "new_scene_prompt" to the full updated scene
-  description (faceless; subject/action/setting/mood only, no style words). For
-  "regenerate" leave it null.
+- For an asset tweak/rewrite that should change the video/image itself, set
+  "new_scene_prompt" to the full updated scene description (faceless;
+  subject/action/setting/mood only, no style words). To keep the same media and
+  change ONLY the on-screen text, leave "new_scene_prompt" null. For "regenerate"
+  leave it null.
+- If the user wants DIFFERENT on-screen HOOK words (not merely resizing), set
+  "new_hook" to the new short hook text — a few punchy words, in the SAME language
+  as the post. Use target "asset". Leave "new_scene_prompt" null to keep the exact
+  video/image and only swap the on-screen words (mode "tweak"); ALSO set
+  "new_scene_prompt" if they want a new video/image too (it is regenerated with the
+  new hook). Otherwise "new_hook" is null.
 - If the request is only to resize the on-image HOOK TEXT (e.g. "make the text
   smaller/bigger", "kleiner/groter maken"), set "text_scale" to a multiplier
   RELATIVE to the current text: 0.8 = a bit smaller, 0.65 = much smaller, 1.25 =
@@ -97,7 +110,7 @@ Decide:
   adapted to THIS post's pillar — do not copy their subject verbatim.
 
 Return exactly the keys:
-{"target","mode","new_scene_prompt","caption_template","caption_instruction","text_scale"}"""
+{"target","mode","new_scene_prompt","new_hook","caption_template","caption_instruction","text_scale"}"""
 
 
 # ---- "make this like week N" reference resolution ---------------------------
@@ -332,19 +345,30 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         if plan.text_scale:
             text_scale = min(2.0, max(0.4, text_scale * plan.text_scale))
 
+        # New on-screen words if requested, else keep the existing hook. (Empty
+        # string from the classifier means "no new hook", not "clear the hook".)
+        hook = plan.new_hook if plan.new_hook else blob.get("hook")
+
         base_url: str | None = blob.get("base_asset_url")
-        text_only = bool(plan.text_scale) and plan.new_scene_prompt is None
+        # Overlay-only: keep the exact media and just re-burn the hook (new words
+        # and/or new size). Skipped for "regenerate" (which wants a fresh take) and
+        # whenever a new scene is given (which needs a full re-render). Treat an
+        # empty-string scene as "no new scene" so a text-only edit stays cheap.
+        overlay_only = (
+            not plan.new_scene_prompt
+            and plan.mode != "regenerate"
+            and (plan.text_scale is not None or bool(plan.new_hook))
+        )
         v_next = current.version_number + 1
-        if text_only and base_url:
-            # Keep the exact image: re-overlay the stored base at the new text size
-            # (no regeneration, no generation cost).
+        if overlay_only and base_url:
+            # Re-overlay the stored base — no regeneration, no generation cost.
             data, ext, ctype = await _reoverlay_from_base(
-                base_url, post.type, blob.get("hook"), text_scale
+                base_url, post.type, hook, text_scale
             )
         else:
             # Regenerate the asset and store its base so future text edits keep it.
             data, base, ext, ctype, asset_cost = await _render_asset(
-                post.type, scene, blob.get("motion"), blob.get("hook"), req.post_id,
+                post.type, scene, blob.get("motion"), hook, req.post_id,
                 scale=text_scale,
             )
             cost += asset_cost
@@ -361,6 +385,7 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         blob = {
             **blob,
             "scene_prompt": scene,
+            "hook": hook,
             "text_scale": text_scale,
             "base_asset_url": base_url,
         }
