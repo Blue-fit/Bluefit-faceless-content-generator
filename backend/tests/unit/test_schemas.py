@@ -30,7 +30,7 @@ def _image_spec(**overrides: object) -> dict[str, object]:
         "scene_prompt": "x",
         "caption_template": "question",
         "caption": "c",
-        "references_used": PostReferences(),
+        "references_used": PostReferences(value="Belonging"),
     }
     base.update(overrides)
     return base
@@ -54,3 +54,9 @@ def test_post_spec_rejects_bad_caption_template() -> None:
 def test_generator_output_holds_posts() -> None:
     out = GeneratorOutput(posts=[PostSpec(**_image_spec())])  # type: ignore[arg-type]
     assert len(out.posts) == 1
+
+
+def test_post_spec_beat_is_optional_but_kept() -> None:
+    assert PostSpec(**_image_spec()).beat is None  # type: ignore[arg-type]
+    spec = PostSpec(**_image_spec(beat="offers a high-five to the lens"))  # type: ignore[arg-type]
+    assert spec.beat == "offers a high-five to the lens"

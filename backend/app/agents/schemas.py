@@ -8,13 +8,27 @@ A breaking change to either requires bumping `SCHEMA_VERSION` (agents/CLAUDE.md)
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, Field
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # v2: references_used.value is a required, typed Power-9 anchor
 
 Pillar = Literal["Community", "Keep Moving", "Keep Setting Goals", "Natural Eating"]
+# The nine Blue Zones "Power-9" values. Every post is anchored to exactly one, and
+# the weekly no-repeat rule matches on these exact names (free text defeated it).
+Power9Value = Literal[
+    "Move naturally",
+    "Have a purpose",
+    "Relaxation",
+    "The 80% rule",
+    "Plant-based eating",
+    "Wine in good company",
+    "Belonging",
+    "Family first",
+    "Social circles",
+]
+POWER9_VALUES: tuple[str, ...] = get_args(Power9Value)
 PostType = Literal["image", "video"]
 # Values double as the prompt filename stem: prompts/caption_{template}.md
 CaptionTemplate = Literal["question", "hottake", "observation"]
@@ -46,8 +60,8 @@ class PostReferences(BaseModel):
     """What the generator leaned on — seeds the post's reasoning_blob."""
 
     theme: str | None = Field(default=None, description="TrendTheme title used.")
-    value: str | None = Field(
-        default=None, description="The Power-9 value the post embodies."
+    value: Power9Value = Field(
+        description="The one Power-9 value this post is anchored to (exact name)."
     )
     brand_cues: list[str] = Field(default_factory=list)
     rule_applied: str | None = None
@@ -60,17 +74,25 @@ class PostSpec(BaseModel):
     pillar: Pillar
     type: PostType
     scene_prompt: str = Field(
-        description="The creative scene/subject only — no brand style block."
+        description=(
+            "The creative scene only — the Blue Fit mascot as subject, action, "
+            "setting, composition; no brand style block, no mascot appearance."
+        )
+    )
+    beat: str | None = Field(
+        default=None,
+        description="The one scroll-stopping visual moment/gag, one sentence.",
     )
     motion: str | None = Field(
-        default=None, description="Camera + temporal motion (video only)."
+        default=None,
+        description="Video only: camera move + how the beat pays off within 8s.",
     )
     duration_seconds: int | None = Field(
         default=None, description="Clip length in seconds (video only; fixed 8)."
     )
     hook: str | None = Field(
         default=None,
-        description="Video only: short on-screen opening hook text; null for images.",
+        description="Every post: short on-screen hook text burned onto the asset.",
     )
     caption_template: CaptionTemplate
     caption: str

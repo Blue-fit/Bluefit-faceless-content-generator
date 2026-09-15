@@ -18,7 +18,7 @@ import httpx
 import structlog
 from pydantic import BaseModel
 
-from app.agents.prompt_builder import build_image_prompt, build_video_prompt
+from app.agents.render import render_base
 from app.db.connection import get_pool
 from app.db.models import Week
 from app.db.repositories.post_versions import (
@@ -33,8 +33,6 @@ from app.meter import MeteredResult, MeterRequest, meter, pricing
 from app.storage import AssetUploader
 from app.tools import ToolError
 from app.tools.generate_caption import CaptionRequest, Template, generate_caption
-from app.tools.generate_image import ImageRequest, generate_image
-from app.tools.generate_video import VideoRequest, generate_video
 from app.tools.overlay_hook import overlay_hook, overlay_hook_image
 
 logger = structlog.get_logger(__name__)
@@ -86,16 +84,22 @@ Decide:
 - "mode": "tweak" (small change to the same concept), "regenerate" (same concept,
   a fresh take), or "rewrite" (a meaningfully different concept).
 - For an asset tweak/rewrite that should change the video/image itself, set
-  "new_scene_prompt" to the full updated scene description (faceless;
-  subject/action/setting/mood only, no style words). To keep the same media and
-  change ONLY the on-screen text, leave "new_scene_prompt" null. For "regenerate"
-  leave it null.
+  "new_scene_prompt" to the full updated scene description: the Blue Fit mascot
+  stays the subject (refer to it only as "the Blue Fit mascot" — never describe
+  its appearance), keep the post's beat (the one scroll-stopping moment) unless the
+  user changes it; action/setting/mood only, no style words; any real people
+  faceless. To keep the same media and change ONLY the on-screen text, leave
+  "new_scene_prompt" null. For "regenerate" leave it null.
 - If the user wants DIFFERENT on-screen HOOK words (not merely resizing), set
   "new_hook" to the new short hook text — a few punchy words, in the SAME language
   as the post. Use target "asset". Leave "new_scene_prompt" null to keep the exact
   video/image and only swap the on-screen words (mode "tweak"); ALSO set
   "new_scene_prompt" if they want a new video/image too (it is regenerated with the
-  new hook). Otherwise "new_hook" is null.
+  new hook). The on-screen text is two lines: the hook line, then a caption
+  call-to-action line ending in 👇 (e.g. "Lees de caption 👇"). When the user
+  changes only the hook words, KEEP the existing call-to-action line as the last line
+  (separated by a newline) unless they explicitly remove it. Otherwise "new_hook" is
+  null.
 - If the request is only to resize the on-image HOOK TEXT (e.g. "make the text
   smaller/bigger", "kleiner/groter maken"), set "text_scale" to a multiplier
   RELATIVE to the current text: 0.8 = a bit smaller, 0.65 = much smaller, 1.25 =
@@ -106,8 +110,10 @@ Decide:
   (question|hottake|observation), else null.
 - If a "## Reference posts" section is present, the user is asking to emulate that
   past week's style (e.g. "make this like week two"). Base "new_scene_prompt" (asset)
-  or "caption_instruction" (caption) on the referenced posts' scene/caption style,
-  adapted to THIS post's pillar — do not copy their subject verbatim.
+  or "caption_instruction" (caption) on the referenced posts' setting/mood/caption
+  style, adapted to THIS post's pillar — do not copy their subject verbatim, and
+  the Blue Fit mascot remains the subject even if the referenced posts (older,
+  pre-mascot weeks) show people or scenery instead.
 
 Return exactly the keys:
 {"target","mode","new_scene_prompt","new_hook","caption_template","caption_instruction","text_scale"}"""
@@ -159,7 +165,7 @@ async def _reference_block(
         b = v.reasoning_blob or {}
         lines.append(
             f"- pillar: {b.get('pillar') or p.pillar} | scene: {b.get('scene_prompt')} "
-            f"| hook: {b.get('hook')} | caption: {v.caption}"
+            f"| beat: {b.get('beat')} | hook: {b.get('hook')} | caption: {v.caption}"
         )
     if not lines:
         return None
@@ -207,37 +213,21 @@ async def _render_asset(
     post_id: UUID,
     scale: float = 1.0,
 ) -> tuple[bytes, bytes, str, str, Decimal]:
-    """Re-render an edited asset (metered), burn in its hook at `scale`.
+    """Re-render an edited asset (metered, mascot in frame), burn in its hook at `scale`.
 
     Returns (composited, base, ext, content_type, cost). The base is the
     pre-overlay original — stored so later text-size edits can keep the image.
+    For video the cost includes the mascot still Veo animates from.
     """
-    if post_type == "image":
-        img = await generate_image(
-            ImageRequest(
-                prompt=build_image_prompt(scene),
-                aspect_ratio="9:16",
-                trigger="edit",
-                post_id=post_id,
-            )
-        )
-        ext = ".jpg" if "jpeg" in img.mime_type else ".png"
-        base = img.image_bytes
-        data = await overlay_hook_image(base, hook, ext, scale=scale) if hook else base
-        return data, base, ext, img.mime_type, img.cost_eur
-
-    vid = await generate_video(
-        VideoRequest(
-            prompt=build_video_prompt(scene, motion),
-            aspect_ratio="9:16",
-            duration_seconds=8,
-            trigger="edit",
-            post_id=post_id,
-        )
-    )
-    base = vid.video_bytes
-    data = await overlay_hook(base, hook, scale=scale) if hook else base
-    return data, base, ".mp4", vid.mime_type or "video/mp4", vid.cost_eur
+    asset = await render_base(post_type, scene, motion, post_id=post_id, trigger="edit")
+    base = asset.data
+    if not hook:
+        data = base
+    elif post_type == "image":
+        data = await overlay_hook_image(base, hook, asset.ext, scale=scale)
+    else:
+        data = await overlay_hook(base, hook, scale=scale)
+    return data, base, asset.ext, asset.content_type, asset.cost_eur
 
 
 def _ext_ctype(url: str) -> tuple[str, str]:
@@ -299,7 +289,8 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
     blob = current.reasoning_blob or {}
     summary = (
         f"type: {post.type}\npillar: {post.pillar}\n"
-        f"scene_prompt: {blob.get('scene_prompt')}\ncaption: {current.caption}"
+        f"scene_prompt: {blob.get('scene_prompt')}\nbeat: {blob.get('beat')}\n"
+        f"caption: {current.caption}"
     )
     ref_section = f"\n\n{reference}" if reference else ""
     classify = await _classify(
@@ -323,7 +314,10 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         template = cast(
             Template, raw_template if raw_template in get_args(Template) else "observation"
         )
-        brief = f"{post.pillar} | {blob.get('theme')} | {blob.get('value')} | {blob.get('scene_prompt')}"
+        brief = (
+            f"type: {post.type} | pillar: {post.pillar} | theme: {blob.get('theme')} | "
+            f"value: {blob.get('value')} | scene: {blob.get('scene_prompt')}"
+        )
         caption = await generate_caption(
             CaptionRequest(
                 template=template,
@@ -382,6 +376,37 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
             key=f"edits/{req.post_id}/v{v_next}{ext}",
             content_type=ctype,
         )
+        # Keep the caption bound to the post. The hook is the bait the caption pays
+        # off, and the caption describes the scene — so a new hook or a new scene
+        # means the old caption now tells a different story. Re-sync it (cheap Flash)
+        # BEFORE the blob is overwritten, so "changed" compares against the original.
+        hook_changed = bool(plan.new_hook) and hook != blob.get("hook")
+        scene_changed = bool(plan.new_scene_prompt) and scene != blob.get("scene_prompt")
+        if hook_changed or scene_changed:
+            raw_t = blob.get("engagement_template") or "observation"
+            sync_template = cast(
+                Template, raw_t if raw_t in get_args(Template) else "observation"
+            )
+            sync = await generate_caption(
+                CaptionRequest(
+                    template=sync_template,
+                    brief=(
+                        f"type: {post.type} | pillar: {post.pillar} | theme: {blob.get('theme')} | "
+                        f"value: {blob.get('value')} | scene: {scene}"
+                    ),
+                    instruction=(
+                        f'The on-screen hook is now: "{hook}". Rewrite the caption so it '
+                        "PAYS OFF this hook — deliver the answer or insight it teases — "
+                        f"and matches the scene: {scene}. Keep the same pillar and "
+                        "Power-9 value."
+                    ),
+                    trigger="edit",
+                    post_id=req.post_id,
+                )
+            )
+            new_caption = sync.caption
+            cost += sync.cost_eur
+
         blob = {
             **blob,
             "scene_prompt": scene,

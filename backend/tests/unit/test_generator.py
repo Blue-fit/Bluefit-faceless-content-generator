@@ -17,3 +17,11 @@ def test_generator_instruction_is_static_brand() -> None:
     assert isinstance(instruction, str)
     assert "Blue Fit" in instruction
     assert "scene_prompt" in instruction
+
+
+def test_generator_instruction_carries_the_mascot_brief() -> None:
+    instruction = build_generator().instruction
+    assert isinstance(instruction, str)
+    assert "the Blue Fit mascot" in instruction
+    assert "`beat`" in instruction
+    assert "not childish" in instruction

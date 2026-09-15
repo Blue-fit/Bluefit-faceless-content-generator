@@ -12,6 +12,11 @@ and "this is just how it feels" moments.
 - Notice something real and small — morning light, the first steps after lunch,
   the calm of a simple meal.
 - Let it breathe: short lines, much feeling in few words (the brand tone).
+- The mascot is called **Bluei**. Check `type` in "This post": for a **video**,
+  write the caption in **Bluei's own voice — first person, speaking directly to the
+  viewer**, and have Bluei **give one concrete piece of advice the viewer can act on
+  today** (a specific, doable action — not a vague tip); for an **image**, mention
+  Bluei by name in the third person.
 
 ## Don't
 - Don't instruct or sell; just observe and let it land.

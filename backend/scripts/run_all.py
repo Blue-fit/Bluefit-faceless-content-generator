@@ -27,6 +27,8 @@ from app.agents.generator import build_generator
 from app.agents.prompt_builder import build_image_prompt, build_video_prompt
 from app.agents.researcher import build_researcher
 from app.agents.schemas import GeneratorOutput
+from app.agents.mascot import load_mascot_refs
+from app.tools import RefImage
 from app.tools.generate_image import render_image
 from app.tools.generate_video import render_video
 from app.tools.overlay_hook import overlay_hook, overlay_hook_image
@@ -41,9 +43,9 @@ HISTORY = OUT / "history.json"
 _RECENT_WEEKS = 3  # how many past weeks to show the generator
 
 _BRAND = (
-    'Blue Fit is "The Blue Zone on the Waal" — premium, cinematic '
-    "wellness-meets-travel: open water, sunrises, riverside, wide landscapes. "
-    "Real people of varied ages, candid, faceless. Not a hardcore gym."
+    'Blue Fit is "The Blue Zone on the Waal" — premium wellness, Blue Zones-inspired: '
+    "four pillars (Community, Keep Moving, Keep Setting Goals, Natural Eating), warm "
+    "grounded voice. Not a hardcore gym. Real people beside the mascot stay faceless."
 )
 _RULE = "ocean blue, not navy"
 
@@ -138,13 +140,17 @@ async def main() -> None:
     posts = sorted(enumerate(out.posts, 1), key=lambda p: p[1].type == "video")
     print("3/3  Rendering assets (images first, video last) ...")
     failures = 0
+    refs = load_mascot_refs()
     for i, post in posts:
         name = f"{i}_{_slug(post.pillar)}_{post.type}"
         try:
+            # Same sequence as app.agents.render: mascot refs -> still; the video
+            # is animated from a still rendered the same way (image-to-video).
+            img = await render_image(
+                build_image_prompt(post.scene_prompt), aspect_ratio="9:16",
+                reference_images=refs,
+            )
             if post.type == "image":
-                img = await render_image(
-                    build_image_prompt(post.scene_prompt), aspect_ratio="9:16"
-                )
                 ext = ".jpg" if "jpeg" in img.mime_type else ".png"
                 data = (
                     await overlay_hook_image(img.image_bytes, post.hook, ext)
@@ -159,6 +165,7 @@ async def main() -> None:
                     build_video_prompt(post.scene_prompt, post.motion),
                     "9:16",
                     post.duration_seconds or 8,
+                    first_frame=RefImage(data=img.image_bytes, mime_type=img.mime_type),
                 )
                 data = (
                     await overlay_hook(vid.video_bytes, post.hook)

@@ -27,3 +27,9 @@ dist/
 .DS_Store
 Thumbs.db
 .idea/
+
+# --- Mascot photo originals (resized copies live in backend/assets/mascot/) ---
+brand/IMG_*.jpg
+
+# --- Local review renders (not for the repo) ---
+NewTest/

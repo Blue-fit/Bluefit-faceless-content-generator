@@ -18,6 +18,7 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
+import asyncpg
 import structlog
 from google.adk.agents import LlmAgent
 from google.adk.runners import InMemoryRunner
@@ -25,17 +26,19 @@ from google.genai import types
 from pydantic import BaseModel
 
 from app.agents.generator import build_generator
-from app.agents.prompt_builder import build_image_prompt, build_video_prompt
+from app.agents.mascot import mascot_refs_version
+from app.agents.render import render_base
 from app.agents.researcher import build_researcher
-from app.agents.schemas import GeneratorOutput, PostSpec
+from app.agents.schemas import SCHEMA_VERSION, GeneratorOutput, PostSpec
 from app.db.connection import get_pool
 from app.db.repositories.brand_chunks import count_chunks
-from app.db.repositories.post_versions import insert_version
-from app.db.repositories.posts import insert_post, set_current_version
+from app.db.repositories.post_versions import get_version, insert_version
+from app.db.repositories.posts import get_posts_for_week, insert_post, set_current_version
 from app.db.repositories.rules import get_active_rules
 from app.db.repositories.weeks import (
     get_week_by_start,
     insert_week,
+    list_weeks,
     set_week_brief,
     set_week_status,
 )
@@ -43,8 +46,6 @@ from app.genai_client import MODEL_EMBED, MODEL_FLASH, MODEL_PRO, embed
 from app.meter import MeteredResult, MeterRequest, meter, pricing
 from app.storage import AssetUploader
 from app.tools.brand_rag import BrandRagRequest, brand_rag
-from app.tools.generate_image import ImageRequest, generate_image
-from app.tools.generate_video import VideoRequest, generate_video
 from app.tools.memory_search import MemorySearchRequest, RecentPost, memory_search
 from app.tools.overlay_hook import overlay_hook, overlay_hook_image
 
@@ -154,6 +155,8 @@ def _recent_block(recent: list[RecentPost]) -> str:
         if len(scene) > 140:
             scene = scene[:140] + "…"
         line = f"- {p.pillar} | theme: {p.theme} | value: {p.value} | hook: {p.hook}"
+        if p.beat:
+            line += f" | beat: {p.beat}"
         if scene:
             line += f" | scene: {scene}"
         lines.append(line)
@@ -161,7 +164,11 @@ def _recent_block(recent: list[RecentPost]) -> str:
 
 
 def _generator_message(
-    themes: str, brand_chunks: list[str], rule_texts: list[str], recent: list[RecentPost]
+    themes: str,
+    brand_chunks: list[str],
+    rule_texts: list[str],
+    recent: list[RecentPost],
+    forbidden_values: frozenset[str] = frozenset(),
 ) -> str:
     brand = "\n\n---\n\n".join(brand_chunks) if brand_chunks else "(none retrieved)"
     rules = "\n".join(f"- {t}" for t in rule_texts) if rule_texts else "(none)"
@@ -171,19 +178,106 @@ def _generator_message(
         if avoid
         else ""
     )
+    forbidden = (
+        ", ".join(sorted(forbidden_values)) if forbidden_values else "(none — first week)"
+    )
     return (
         f"## This week's themes (from the researcher)\n{themes}\n\n"
-        f"## Brand context (retrieved from the requirements doc)\n{brand}\n\n"
+        "## Brand context (retrieved from the requirements doc) — use it for VALUES, "
+        "VOICE and PILLARS only; ignore any visual/photography/pacing direction in it. "
+        "The visual world is fixed by the mascot brief in your instructions.\n"
+        f"{brand}\n\n"
         f"## Active rules\n{rules}\n\n"
         f"## Recently covered (make this week DIFFERENT)\n{_recent_block(recent)}\n\n"
-        "Produce the 3 PostSpecs now (2 image, 1 video, distinct pillars). "
-        "Make them clearly different from the recently covered posts above. "
+        "## Forbidden Power-9 values (used LAST week — do NOT use any of these)\n"
+        f"{forbidden}\n\n"
+        "Produce the 3 PostSpecs now (2 image, 1 video). WEEKLY ANCHOR RULE: each post "
+        "is anchored to exactly ONE Power-9 value bound to exactly ONE pillar; across "
+        "the 3 posts use 3 DIFFERENT values and 3 DIFFERENT pillars, and NONE of the "
+        "forbidden values above, each starring the Blue Fit mascot with one "
+        "explicit `beat`. "
+        "Make them clearly different from the recently covered posts above — "
+        "different themes, values, settings AND beats. "
         f"{avoid_line}"
         "Give each post a DISTINCT visual setting, and do NOT default to water/ocean "
         "scenes just because the brand is 'Blue' — vary the setting (park, gym, home, "
         "kitchen, city, forest, studio, market, ...). The video in particular MUST use "
         "a setting not seen in the recent posts above."
     )
+
+
+async def _last_week_values(conn: asyncpg.Connection, week_start: date) -> frozenset[str]:
+    """The Power-9 values used by the most recent week BEFORE `week_start`.
+
+    Client rule: the 3 values picked in a week cannot repeat in the next (a one-week
+    cooldown; they return the week after). Empty on cold start. A re-run of the
+    current week is excluded so it never forbids its own values.
+    """
+    earlier = [w for w in await list_weeks(conn) if w.week_start < week_start]
+    if not earlier:
+        return frozenset()
+    prev = max(earlier, key=lambda w: w.week_start)
+    values: set[str] = set()
+    for p in await get_posts_for_week(conn, prev.id):
+        if p.current_version_id is None:
+            continue
+        v = await get_version(conn, p.current_version_id)
+        val = (v.reasoning_blob or {}).get("value") if v else None
+        if val:
+            values.add(str(val))
+    return frozenset(values)
+
+
+def _value_rule_violations(out: GeneratorOutput, forbidden: frozenset[str]) -> list[str]:
+    """Why the week breaks the anchor rule (empty list = OK). Pure, unit-testable.
+
+    Rule: 3 different Power-9 values, 3 different pillars (1 value <-> 1 pillar per
+    post), and none of the values used last week.
+    """
+    values = [p.references_used.value for p in out.posts]
+    pillars = [p.pillar for p in out.posts]
+    problems: list[str] = []
+    if len(set(values)) != len(values):
+        problems.append(f"values repeat within the week: {values}")
+    if len(set(pillars)) != len(pillars):
+        problems.append(f"pillars repeat within the week: {pillars}")
+    # Case-insensitive: weeks generated before the typed Power9Value stored free text.
+    banned = {f.lower() for f in forbidden}
+    used_forbidden = sorted(v for v in set(values) if v.lower() in banned)
+    if used_forbidden:
+        problems.append(f"values used last week (forbidden): {used_forbidden}")
+    return problems
+
+
+async def _enforce_value_rules(
+    out: GeneratorOutput, forbidden: frozenset[str], base_message: str, week_start: date
+) -> GeneratorOutput:
+    """Re-prompt once if the week breaks the value/pillar anchor rule.
+
+    Runs before any rendering, so no asset spend is wasted. Best-effort: if the
+    correction still violates the rule we keep whichever attempt is closer and log
+    it — variety never blocks a weekly run.
+    """
+    problems = _value_rule_violations(out, forbidden)
+    if not problems:
+        return out
+    logger.info("pipeline.value_rule_violation", problems=problems)
+    correction = (
+        f"{base_message}\n\n## CORRECTION\nYour 3 posts break the weekly anchor rule: "
+        f"{'; '.join(problems)}. Regenerate all 3 posts so they use 3 DIFFERENT Power-9 "
+        "values and 3 DIFFERENT pillars, and use NONE of the forbidden values."
+    )
+    try:
+        retried = GeneratorOutput.model_validate_json(
+            _strip(await _run_agent(build_generator(), correction, f"wk-{week_start}-v2"))
+        )
+    except Exception:  # noqa: BLE001 — rule retry is best-effort, never fatal
+        logger.warning("pipeline.value_rule_retry_failed", problems=problems)
+        return out
+    remaining = _value_rule_violations(retried, forbidden)
+    if remaining:
+        logger.warning("pipeline.value_rule_unresolved", problems=remaining)
+    return retried if len(remaining) <= len(problems) else out
 
 
 def _prompt_version() -> str:
@@ -202,11 +296,12 @@ def _reasoning_blob(
 ) -> dict:
     r = spec.references_used
     return {
-        "schema_version": 1,
+        "schema_version": SCHEMA_VERSION,
         "pillar": spec.pillar,
         "theme": r.theme,
         "value": r.value,
         "hook": spec.hook,
+        "beat": spec.beat,
         "scene_prompt": spec.scene_prompt,
         "base_asset_url": base_asset_url,
         "motion": spec.motion,
@@ -218,12 +313,16 @@ def _reasoning_blob(
         "engagement_template": spec.caption_template,
         "models": {"generator": MODEL_PRO, "researcher": MODEL_FLASH, "asset": asset_model},
         "prompt_version": _prompt_version(),
+        "mascot_refs_version": mascot_refs_version(),
     }
 
 
 def _reason_text(spec: PostSpec) -> str:
     r = spec.references_used
-    return f"{spec.pillar} | {r.theme} | {r.value} | {spec.hook} | {spec.scene_prompt} | {spec.caption}"
+    return (
+        f"{spec.pillar} | {r.theme} | {r.value} | {spec.hook} | {spec.beat} | "
+        f"{spec.scene_prompt} | {spec.caption}"
+    )
 
 
 @dataclass
@@ -237,33 +336,23 @@ class _Asset:
 
 
 async def _render(spec: PostSpec, post_id: UUID) -> _Asset:
-    """Render one PostSpec (metered) and burn in its hook; keep the pre-overlay base."""
-    if spec.type == "image":
-        res = await generate_image(
-            ImageRequest(
-                prompt=build_image_prompt(spec.scene_prompt),
-                aspect_ratio="9:16",
-                trigger="cron",
-                post_id=post_id,
-            )
-        )
-        ext = ".jpg" if "jpeg" in res.mime_type else ".png"
-        base = res.image_bytes
-        data = await overlay_hook_image(base, spec.hook, ext) if spec.hook else base
-        return _Asset(data, base, res.model, res.cost_eur, ext, res.mime_type)
-
-    vid = await generate_video(
-        VideoRequest(
-            prompt=build_video_prompt(spec.scene_prompt, spec.motion),
-            aspect_ratio="9:16",
-            duration_seconds=spec.duration_seconds or 8,
-            trigger="cron",
-            post_id=post_id,
-        )
+    """Render one PostSpec (metered, mascot in frame) and burn in its hook; keep the base."""
+    asset = await render_base(
+        spec.type,
+        spec.scene_prompt,
+        spec.motion,
+        post_id=post_id,
+        trigger="cron",
+        duration_seconds=spec.duration_seconds or 8,
     )
-    base = vid.video_bytes
-    data = await overlay_hook(base, spec.hook) if spec.hook else base
-    return _Asset(data, base, vid.model, vid.cost_eur, ".mp4", vid.mime_type or "video/mp4")
+    base = asset.data
+    if not spec.hook:
+        data = base
+    elif spec.type == "image":
+        data = await overlay_hook_image(base, spec.hook, asset.ext)
+    else:
+        data = await overlay_hook(base, spec.hook)
+    return _Asset(data, base, asset.model, asset.cost_eur, asset.ext, asset.content_type)
 
 
 async def _enforce_scene_variety(
@@ -352,16 +441,19 @@ async def run_weekly(week_start: date, *, uploader: AssetUploader) -> WeekResult
     )
     async with pool.acquire() as conn:
         rules = await get_active_rules(conn)
+        forbidden = await _last_week_values(conn, week_start)
     rule_ids = [r.id for r in rules]
+    logger.info("pipeline.forbidden_values", values=sorted(forbidden))
     total = brand.cost_eur + recent.cost_eur
 
     # 3. generate 3 specs grounded in the retrieved context
     message = _generator_message(
-        themes, brand.chunks, [r.text for r in rules], recent.versions
+        themes, brand.chunks, [r.text for r in rules], recent.versions, forbidden
     )
     out = GeneratorOutput.model_validate_json(
         _strip(await _run_agent(build_generator(), message, f"wk-{week_start}-g"))
     )
+    out = await _enforce_value_rules(out, forbidden, message, week_start)
     out = await _enforce_scene_variety(
         out, _recent_scene_families(recent.versions), message, week_start
     )

@@ -14,6 +14,11 @@ best for community, habits, and reflection topics.
 - Keep the question concrete: *"Wat motiveert jou het meest?"*, *"Welke kleine
   gewoonte houdt jou in beweging?"*
 - Earn the question — give something of value in the body before you ask.
+- The mascot is called **Bluei**. Check `type` in "This post": for a **video**,
+  write the caption in **Bluei's own voice — first person, speaking directly to the
+  viewer**, and have Bluei **give one concrete piece of advice the viewer can act on
+  today** (a specific, doable action — not a vague tip); for an **image**, mention
+  Bluei by name in the third person.
 
 ## Don't
 - Don't ask more than one question.

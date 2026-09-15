@@ -32,3 +32,5 @@ Primary System Colors: Ocean Blue, Dark Blue, Light Blue, Black.
 
 ## System Typography:
 Montserrat.
+# The Mascot
+Blue Fit has a real, life-size plush mascot — a large light-blue (ocean blue) bear with a white muzzle, black nose and a simple smile. Since September 2026 it is the hero of all content: every post, image and video, shows the mascot acting out one of the four pillars in a real place (gym floor, lounge, kitchen, park, market, bike path, office). It has no name ("de Blue Fit beer"), never speaks, and is referred to in the third person; the brand voice stays the narrator. Tone: charming, a little deadpan, adult humour — attention-grabbing through contrast, surprise and interaction, never childish, never hype. Real people beside it remain faceless. (Documentation only — the RAG ingests `context/Faceless content Blue fit- Requirements.md`.)

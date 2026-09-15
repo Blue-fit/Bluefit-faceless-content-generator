@@ -29,10 +29,10 @@ _MESSAGE = """## This week's themes (from the researcher)
 - "Cultivating Calm / Downshifting" (Relaxation): small daily rituals to reduce stress.
 - "Vitality of Connection" (Community): strong social bonds and longevity.
 
-## Brand context (retrieved brand chunks)
-Blue Fit is "The Blue Zone on the Waal" — premium, cinematic wellness-meets-travel:
-open water, sunrises, riverside, wide landscapes. Real people of varied ages,
-candid, in gentle motion. Not a hardcore gym.
+## Brand context (retrieved brand chunks — values, voice, pillars only)
+Blue Fit is "The Blue Zone on the Waal" — premium wellness, Blue Zones-inspired:
+four pillars (Community, Keep Moving, Keep Setting Goals, Natural Eating), warm
+grounded voice. Not a hardcore gym. Real people beside the mascot stay faceless.
 
 ## Active rules
 - ocean blue, not navy

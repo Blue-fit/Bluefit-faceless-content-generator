@@ -35,9 +35,9 @@ USER_ID = "client"
 
 # Sample brand context — the real pipeline retrieves this via brand_rag.
 _BRAND_CONTEXT = (
-    'Blue Fit is "The Blue Zone on the Waal" — premium, cinematic '
-    "wellness-meets-travel: open water, sunrises, riverside, wide landscapes. "
-    "Real people of varied ages, candid, in gentle motion. Not a hardcore gym."
+    'Blue Fit is "The Blue Zone on the Waal" — premium wellness, Blue Zones-inspired: '
+    "four pillars (Community, Keep Moving, Keep Setting Goals, Natural Eating), warm "
+    "grounded voice. Not a hardcore gym. Real people beside the mascot stay faceless."
 )
 _RULE = "ocean blue, not navy"
 

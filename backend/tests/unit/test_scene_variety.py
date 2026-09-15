@@ -44,3 +44,8 @@ def test_recent_families_collects_and_drops_other() -> None:
         _post("An abstract close-up of textured fabric"),  # -> other, dropped
     ]
     assert _recent_scene_families(recent) == {"water", "home"}
+
+def test_mascot_mention_does_not_pollute_the_setting_family() -> None:
+    """The scene names the mascot but never describes it, so only the setting counts."""
+    assert _scene_family("The Blue Fit mascot slicing a cucumber in a home kitchen") == "kitchen"
+    assert _scene_family("The Blue Fit mascot on a rooftop in the city at dusk") == "urban"

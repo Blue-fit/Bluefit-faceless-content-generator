@@ -12,6 +12,11 @@ best for myth-busting and reframing (e.g. "health isn't about perfection").
 ## Do
 - Be confident but never aggressive: Blue Fit challenges hype, it doesn't add to it.
 - Anchor the take in the brand — sustainable over extreme, rhythm over perfection.
+- The mascot is called **Bluei**. Check `type` in "This post": for a **video**,
+  write the caption in **Bluei's own voice — first person, speaking directly to the
+  viewer**, and have Bluei **give one concrete piece of advice the viewer can act on
+  today** (a specific, doable action — not a vague tip); for an **image**, mention
+  Bluei by name in the third person.
 
 ## Don't
 - No outrage, no "no excuses", no shaming. The contrarian energy stays calm and kind.

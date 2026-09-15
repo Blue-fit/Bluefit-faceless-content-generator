@@ -14,13 +14,27 @@ import asyncio
 import io
 import shutil
 import tempfile
+from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
 _FONT = Path(__file__).resolve().parents[2] / "assets" / "fonts" / "Montserrat-Bold.ttf"
+# Colour-emoji font for the caption call-to-action's pointer (e.g. "Lees de caption
+# \U0001F447"). Montserrat has no emoji glyphs, so emoji runs are drawn from this font.
+# First the bundled Noto (what Render/Linux uses), then the Windows dev-box font.
+_EMOJI_FONTS = (
+    _FONT.parent / "NotoColorEmoji.ttf",
+    Path("C:/Windows/Fonts/seguiemj.ttf"),
+)
+_NOTO_STRIKE = 109  # Noto Color Emoji is a CBDT bitmap font: only this size loads
+_VS16 = "\ufe0f"  # emoji variation selector: never drawn, never counted
 
 _MAX_CHARS = 16
+# Vertical anchor for the hook (fraction of height). Upper third for both stills
+# and clips: inside Instagram's safe zone and clear of the mascot, which fills
+# the centre of every frame (the style block reserves headroom for it).
+_HOOK_Y_FRAC = 0.22
 _FILL = (255, 255, 255)        # white
 _BRAND_BLUE = (30, 110, 180)   # #1E6EB4 — ocean blue, not navy
 _SHADOW = (0, 0, 0, 100)       # semi-transparent black drop shadow
@@ -30,17 +44,34 @@ class OverlayError(RuntimeError):
     """Raised when the hook overlay fails."""
 
 
+def _is_emoji(ch: str) -> bool:
+    o = ord(ch)
+    return o >= 0x1F000 or 0x2600 <= o <= 0x27BF or 0x2B00 <= o <= 0x2BFF
+
+
+def _text_width(s: str) -> int:
+    """Characters that count toward wrapping (emoji + selectors are free)."""
+    return sum(1 for c in s if not _is_emoji(c) and c != _VS16)
+
+
 def _wrap(text: str, max_chars: int = _MAX_CHARS) -> str:
+    """Word-wrap each line to `max_chars`.
+
+    Explicit newlines are hard breaks (the hook line vs the caption call-to-action
+    line). Emoji don't count toward the width: they're drawn separately and must
+    never be wrapped off the end of their line.
+    """
     lines: list[str] = []
-    current = ""
-    for word in text.split():
-        if current and len(current) + 1 + len(word) > max_chars:
+    for para in text.split("\n"):
+        current = ""
+        for word in para.split():
+            if current and _text_width(current) + 1 + _text_width(word) > max_chars:
+                lines.append(current)
+                current = word
+            else:
+                current = f"{current} {word}".strip()
+        if current:
             lines.append(current)
-            current = word
-        else:
-            current = f"{current} {word}".strip()
-    if current:
-        lines.append(current)
     return "\n".join(lines)
 
 
@@ -50,33 +81,100 @@ def _load_font(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(str(_FONT), size)
 
 
+@lru_cache
+def _load_emoji_font() -> ImageFont.FreeTypeFont | None:
+    """The colour-emoji font, or None (emoji then degrade to a plain arrow)."""
+    for path in _EMOJI_FONTS:
+        if not path.exists():
+            continue
+        try:
+            return ImageFont.truetype(str(path), _NOTO_STRIKE if "Noto" in path.name else 96)
+        except OSError:
+            continue
+    return None
+
+
+@lru_cache(maxsize=64)
+def _emoji_glyph(ch: str, size: int) -> Image.Image | None:
+    """Render one emoji as an RGBA tile `size` px tall (None if it can't be drawn)."""
+    font = _load_emoji_font()
+    if font is None:
+        return None
+    strike = int(font.size)
+    tile = Image.new("RGBA", (strike * 2, strike * 2), (0, 0, 0, 0))
+    ImageDraw.Draw(tile).text((0, 0), ch, font=font, embedded_color=True)
+    bbox = tile.getbbox()
+    if not bbox:
+        return None
+    glyph = tile.crop(bbox)
+    return glyph.resize((max(1, round(glyph.width * size / glyph.height)), size), Image.Resampling.LANCZOS)
+
+
+def _runs(line: str) -> list[tuple[str, bool]]:
+    """Split a line into (text, is_emoji) runs; each emoji is its own run."""
+    runs: list[tuple[str, bool]] = []
+    for ch in line:
+        if ch == _VS16:
+            continue
+        if _is_emoji(ch):
+            runs.append((ch, True))
+        elif runs and not runs[-1][1]:
+            runs[-1] = (runs[-1][0] + ch, False)
+        else:
+            runs.append((ch, False))
+    return runs
+
+
 def _draw_hook(
-    draw: ImageDraw.ImageDraw,
+    canvas: Image.Image,
     text: str,
     font: ImageFont.FreeTypeFont,
-    img_w: int,
-    img_h: int,
     y_frac: float,
     line_spacing: int = 12,
 ) -> None:
-    """Draw `text` centred horizontally at `y_frac` of image height."""
+    """Draw `text` centred horizontally at `y_frac` of the canvas height.
+
+    Text runs use the brand font (drop shadow + blue outline + white fill); emoji
+    runs are pasted from the colour-emoji font, scaled to the text height. With no
+    emoji font available, emoji degrade to a plain "\u2193" so a missing font can
+    never break a post.
+    """
+    if _load_emoji_font() is None:
+        text = "".join("\u2193" if _is_emoji(c) else c for c in text if c != _VS16)
+    draw = ImageDraw.Draw(canvas)
+    img_w, img_h = canvas.size
+    size = int(font.size)
+    line_h = size + line_spacing
+    gap = size // 5  # breathing room before an emoji
     lines = text.split("\n")
-    line_h = int(font.size) + line_spacing
     total_h = line_h * len(lines) - line_spacing
     y = int(img_h * y_frac - total_h / 2)
 
-    for line in lines:
-        bbox = draw.textbbox((0, 0), line, font=font)
-        text_w = bbox[2] - bbox[0]
-        x = (img_w - text_w) // 2
+    def run_width(run: str, is_emoji: bool) -> int:
+        if is_emoji:
+            glyph = _emoji_glyph(run, size)
+            return glyph.width + gap if glyph is not None else 0
+        bbox = draw.textbbox((0, 0), run, font=font)
+        return int(bbox[2] - bbox[0])
 
-        # Drop shadow
-        draw.text((x + 2, y + 2), line, font=font, fill=_SHADOW)
-        # Outline (simulate border)
-        for dx, dy in [(-3, 0), (3, 0), (0, -3), (0, 3)]:
-            draw.text((x + dx, y + dy), line, font=font, fill=(*_BRAND_BLUE, 255))
-        # White fill
-        draw.text((x, y), line, font=font, fill=(*_FILL, 255))
+    for line in lines:
+        runs = _runs(line)
+        widths = [run_width(t, e) for t, e in runs]
+        x = (img_w - sum(widths)) // 2
+        for (t, is_emoji), w in zip(runs, widths, strict=True):
+            if is_emoji:
+                glyph = _emoji_glyph(t, size)
+                if glyph is not None:
+                    canvas.alpha_composite(glyph, (x + gap, y))
+            else:
+                # Drop shadow
+                draw.text((x + 2, y + 2), t, font=font, fill=_SHADOW)
+                # Outline (simulate border)
+                for dx, dy in [(-3, 0), (3, 0), (0, -3), (0, 3)]:
+                    draw.text((x + dx, y + dy), t, font=font, fill=(*_BRAND_BLUE, 255))
+                # White fill
+                draw.text((x, y), t, font=font, fill=(*_FILL, 255))
+            x += w
         y += line_h
 
 
@@ -87,8 +185,7 @@ def _render_overlay_png(
     font_size = max(14, int((height // 20) * scale))
     font = _load_font(font_size)
     canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(canvas)
-    _draw_hook(draw, _wrap(hook), font, width, height, y_frac)
+    _draw_hook(canvas, _wrap(hook), font, y_frac)
     buf = io.BytesIO()
     canvas.save(buf, format="PNG")
     return buf.getvalue()
@@ -97,7 +194,7 @@ def _render_overlay_png(
 async def overlay_hook_image(
     image_bytes: bytes, hook: str, ext: str = ".jpg", scale: float = 1.0
 ) -> bytes:
-    """Return the still with `hook` burned in centred (Montserrat, white).
+    """Return the still with `hook` burned in (Montserrat, white, upper third).
 
     `scale` multiplies the auto-computed font size (1.0 = default; <1 smaller).
     """
@@ -106,8 +203,7 @@ async def overlay_hook_image(
     font = _load_font(font_size)
 
     overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
-    _draw_hook(draw, _wrap(hook), font, img.width, img.height, 0.5)
+    _draw_hook(overlay, _wrap(hook), font, _HOOK_Y_FRAC)
     composited = Image.alpha_composite(img, overlay)
 
     out_mode = "RGB" if ext.lower() in (".jpg", ".jpeg") else "RGBA"
@@ -148,7 +244,7 @@ async def overlay_hook(video_bytes: bytes, hook: str, scale: float = 1.0) -> byt
         except ValueError:
             w, h = 720, 1280  # fallback for 9:16
 
-        overlay_png = _render_overlay_png(w, h, hook, y_frac=0.22, scale=scale)
+        overlay_png = _render_overlay_png(w, h, hook, y_frac=_HOOK_Y_FRAC, scale=scale)
         (d / "overlay.png").write_bytes(overlay_png)
 
         # Composite: show the hook for the entire clip

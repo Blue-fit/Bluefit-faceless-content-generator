@@ -1,5 +1,80 @@
 # Prompts changelog
 
+## 2026-09-15
+- `agents/prompts/generator.md` — **the Blue Fit mascot is now the hero of every
+  post.** New "The hero" and "Tone: attention-grabbing, not childish" sections
+  (contrast / surprise / interaction / mini-challenge / visual pun devices; deadpan
+  adult humour; no party props). `scene_prompt` names it only as "the Blue Fit
+  mascot" and never describes its look (the reference photos + style block do; look
+  words would also trip the scene-family variety guard). New required `beat` field
+  (the one scroll-stopping moment); for video `scene_prompt` is the opening frame and
+  `motion` is the camera move + how the beat pays off. Brand context is explicitly
+  values/voice/pillars only. Faceless rule kept for real people. Reason: client
+  feedback that the calm cinematic posts were too easy-going and not
+  attention-grabbing; they want their mascot to carry the values.
+- `agents/prompts/style_block.md` — replaced: mascot-consistency block (keep the
+  design of the mascot in the provided reference image(s), no cartoon/CG restyle,
+  exactly one mascot), punchy clean high-contrast photographic look, headroom for the
+  on-screen hook (top quarter clear), adult club members faceless; negative list kept
+  minus "calm/unhurried", plus party props / cartoon rendering / extra characters.
+  The subject is deliberately framed as *"the official mascot suit of Blue Fit, an
+  adult fitness club … editorial sports-marketing photography"* and never as a
+  plush/teddy: Google's hard image filter blocked every photo-referenced render
+  under toy-like wording (decisions/008 §8).
+- `agents/prompts/style_block_image.md` — mascot is the sharp, fully visible subject.
+- `agents/prompts/style_block_video.md` — replaced: animate from the provided first
+  frame (image-to-video), one continuous dynamic camera move, one beat inside 8 s,
+  upbeat non-aggressive sound design, no speech. Reason: same pivot; video is now
+  Nano Banana still → Veo first frame (see decisions/008).
+- `agents/prompts/generator.md` — scene-writing rules for the same filter: no
+  *plush/teddy/toy/cuddly/kids/children/baby/bedroom*, no knives or cutting scenes,
+  people are always "adult members". Hook/caption sections tightened (curiosity-gap
+  shapes; the caption must pay the hook off).
+- `agents/prompts/researcher.md` — brand line no longer says the content is
+  calm/cinematic; prefer themes a mascot can act out visually.
+- `agents/prompts/caption_*.md` — the mascot is *de Blue Fit beer*, third person,
+  never the narrator, never named.
+- `agents/prompts/generator.md` — **clarified the hook↔caption division of labour.**
+  The `hook` (every post, image + video) is now defined as *attention/curiosity bait
+  only* — its one job is to stop the scroll and make the viewer open the caption; it
+  must NOT contain the insight (explicitly rejects merely-poetic lines like *"het ritme
+  van het bos"*), and prefers a counter-intuitive claim / provocative question / teaser
+  shape while keeping the searchable-keyword weaving. The `caption` is now stated as
+  *where the real value lives* and must **pay off** the hook (deliver the promised
+  insight, no dangling curiosity gap). Reason: client feedback — the hook grabs
+  attention, the caption is the sauce; generated hooks were pretty but weren't driving
+  people into the caption. **Same-day follow-up:** the on-screen text is now the hook
+  line (≤7 words) **plus an explicit caption call-to-action** (≤16 chars so it sits on
+  its own line; varied across posts: *Lees de caption* / *Meer in caption* / *Lees
+  verder ↓* / *Antwoord ↓*). Reason: a curiosity gap alone assumes the viewer knows the
+  answer is in the caption — tell them where to go.
+- `agents/prompts/generator.md` — **weekly anchor rule.** Power-9 values are now listed
+  by their nine exact names, and every post is anchored to exactly ONE value bound to
+  exactly ONE pillar; the week must use 3 different values and 3 different pillars, and
+  none of the values used LAST week (the message now carries a *Forbidden Power-9
+  values* section = a one-week cooldown). `references_used.value` is now required and
+  typed (`schemas.Power9Value`, SCHEMA_VERSION 2) so the rule matches exactly, and
+  `pipeline._enforce_value_rules` re-prompts once on a violation before any rendering.
+  Reason: client wants structured week-over-week diversity — 3 values x 3 pillars, 1:1,
+  with last week's values off-limits.
+- `agents/prompts/generator.md` — **CTA is its own line and ends in 👇.** The on-screen
+  text is now hook line + line break + caption call-to-action, and the CTA always ends
+  with the pointing-down emoji (*Lees de caption 👇*). `overlay_hook.py` learned to honour
+  line breaks and to draw emoji from a bundled colour font (`assets/fonts/NotoColorEmoji.ttf`,
+  OFL) — Montserrat has no emoji glyphs — with a plain arrow fallback if the font is
+  missing. Reason: client wants an explicit, emoji-marked nudge to read the caption.
+- `agents/prompts/generator.md`, `caption_question.md`, `caption_hottake.md`,
+  `caption_observation.md` — **the mascot is named Bluei.** Video captions are written in
+  Bluei's own voice (first person, talking to the viewer); image captions refer to Bluei
+  by name in the third person. On screen it still never speaks. Replaces the earlier
+  "no name / never the narrator / *de Blue Fit beer*" rule. The edit-time caption tool now
+  receives the post `type` so a video re-sync also comes out in Bluei's voice. Reason:
+  client direction.
+- `agents/prompts/generator.md` + `caption_*.md` — **video captions: Bluei gives one
+  concrete piece of advice the viewer can act on today** (a specific, doable action, not
+  a vague tip), on top of speaking in first person. Images unchanged (third person by
+  name). Reason: client direction.
+
 ## 2026-07-13
 - `agents/prompts/generator.md` — added a **"Vary the visual setting"** rule. The
   `recently covered` block now surfaces each past post's `scene`, and the generator

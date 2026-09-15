@@ -456,3 +456,35 @@ Ocean-blue branding mag subtiel zichtbaar zijn in:
 * lucht  
 * interieurdetails.
 
+
+# **4\. De Mascotte**
+
+## **Rol**
+
+Blue Fit heeft een echte, levensgrote pluche mascotte: een grote lichtblauwe beer
+(ocean blue, witte snuit, zwarte neus, simpele glimlach). Sinds september 2026 is de
+mascotte de **hoofdrolspeler van alle content**: elke post — beeld én video — laat de
+mascotte een van de vier peilers *uitbeelden*. De mascotte vervangt daarmee de
+gezichtloze mensbeelden; **de regel "geen gezichten herkenbaar in beeld" blijft
+gelden voor echte mensen** die naast de mascotte in beeld komen (van achteren,
+afgesneden, handen, op afstand).
+
+## **Karakter**
+
+* Geen naam: gewoon *de Blue Fit beer*.
+* Praat nooit; communiceert met lichaamstaal en situaties.
+* Charmant en een beetje droog — een rustige, zelfverzekerde volwassen humor.
+  **Niet kinderachtig**, geen kinder-tv-beer, geen ballonnen of confetti.
+* Wordt in captions in de derde persoon genoemd; de merkstem blijft de verteller.
+
+## **Beeldrichting**
+
+* De echte pluche mascotte, gefotografeerd in **echte plekken**: gymvloer, lounge,
+  keuken, park, markt, fietspad, kantoor, supermarkt, dak, rivieroever.
+* Fotografisch, scherp, helder en **pakkend** — geen cartoon of 3D-stijl.
+* Aandacht komt uit **contrast, verrassing en interactie** (de beer kijkt de kijker
+  aan, daagt uit, doet iets kleins en precies), nooit uit hype of "no excuses".
+* Elke post heeft **één duidelijk moment** (de "beat") dat de scroll stopt.
+* Video: dynamische maar beheerste camera, één beat binnen 8 seconden, vrolijk maar
+  niet agressief geluid, geen stem.
+* De oneliner staat bovenin beeld; boven het hoofd van de beer blijft ruimte vrij.

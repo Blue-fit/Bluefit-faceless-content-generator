@@ -28,8 +28,9 @@ Cover these six, conversationally — not as rigid labels:
   Default 1K is fine for IG; 2K for crispness.
 - **Text rendering:** strong — good for legible on-image text *when asked* (use
   Montserrat). Our default is **no on-image text** unless the post needs it.
-- **Reference images:** up to ~10 — this is how the **edit "tweak"** mode keeps a
-  previous image's look (pass the prior asset as reference).
+- **Reference images:** up to ~10 as image `Part`s in `contents` — this is how
+  every render carries the **mascot photos** (`app/agents/mascot.py`), so the bear
+  is *this* costume and not a generic blue bear.
 - **Negative prompting:** there is **no separate negative field.** Express "avoid X"
   in plain language inside the prompt (this is why the style block spells out the
   negative list).
@@ -67,15 +68,21 @@ Cover these six, conversationally — not as rigid labels:
   **8s-only**.
 - **Aspect ratio:** `16:9` or **`9:16`** → use **9:16** (vertical Reels/Stories).
   Note Veo does **not** offer 4:5, so video ≠ image aspect ratio.
-- **Image-to-video / first frame:** seed from a still — this is how the edit
-  "tweak (video)" mode reuses a previous video's first frame.
+- **Image-to-video / first frame:** seed from a still. **This is how the mascot
+  stays consistent in video** (decisions/008): Nano Banana renders the opening frame
+  with the mascot reference photos, Veo animates it via `image=`. Prompt the *motion
+  and the beat's payoff*; the composition is fixed by the still.
+- **Reference images ("ingredients", ≤3 ASSET):** implemented in `render_video` as a
+  probe only — reported to work only at 16:9 on the non-Fast model on the Developer
+  API. `scripts/run_video.py --refs` tests it.
 
 ### Do / Don't
 - ✅ Use descriptive adjectives/adverbs; name the camera move explicitly.
 - ✅ Add "portrait" for better facial detail when people are featured.
-- ✅ Specify ambient audio so it stays calm/natural (per brand).
+- ✅ Specify the sound design: upbeat, playful, non-aggressive; no speech (the
+  mascot never talks).
 - ❌ Don't assume >8s "just works" — plan for extension or cap at 8s.
-- ❌ Don't request hype music or fast cuts (off-brand).
+- ❌ Don't request hype music, crowd noise, or cuts (one continuous move).
 
 ---
 

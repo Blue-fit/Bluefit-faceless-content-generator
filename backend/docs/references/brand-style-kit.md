@@ -70,14 +70,21 @@ ladder up to one of these — it keeps content unmistakably Blue Fit.
 **Typography:** Montserrat — only relevant when text is rendered *into* an image
 (Nano Banana renders text well; see the playbook).
 
-## 5. Aesthetic — DO
+## 5. Aesthetic — DO (mascot era, from 2026-09-15)
 
-- Cinematic, editorial photography feel; premium but authentic.
-- **Natural light** — golden-hour or soft overcast.
-- **Real people**, varied ages and body types, candid and in motion.
-- Open natural environments (open water, riverside, sunrise skies, mountains) or
-  clean, light-filled functional training spaces.
-- Spacious composition with room to breathe; unhurried mood.
+- **The Blue Fit mascot is the hero of every post** — the real, life-size plush
+  blue bear costume, reproduced 1:1 from the reference photos in
+  `backend/assets/mascot/`. Refer to it as "the Blue Fit mascot"; never describe
+  its look in a scene (the style block does).
+- Photographic, sharp, clean and **punchy**: bright natural or practical light,
+  high contrast, the mascot's ocean blue popping against a real, credible place.
+- **Real places** the members know: gym floor, lounge, kitchen, park, market, bike
+  path, office, supermarket, rooftop, riverbank, station platform.
+- Attention through **contrast, surprise, interaction, mini-challenges, visual
+  puns** on the value — charming and a little deadpan, adult humour.
+- One clear **beat** per post; the top quarter of the frame is clean headroom for
+  the on-screen hook.
+- Real people may appear for scale/community/contrast — **always faceless**.
 
 ## 6. Aesthetic — the NEGATIVE list (never)
 
@@ -87,33 +94,18 @@ This is as important as the DO list. **Avoid:**
 - Aggressive, salesy, or hype influencer energy.
 - Warm/orange/neon colour grades; harsh artificial lighting.
 - Stock-photo cheesiness; on-image text unless explicitly requested.
+- **Childish**: party props (balloons, confetti), cartoon/anime rendering of the
+  mascot, kids'-TV slapstick, extra mascots or characters.
+- Any identifiable human face.
 
-## 7. Ready-to-paste STYLE BLOCK drafts
+## 7. STYLE BLOCKS
 
-The deterministic suffix appended to every generated scene prompt (the "hybrid
-build"). Two variants because video needs motion + ambiance.
-
-**Image style block (Nano Banana):**
-```
-Style: cinematic editorial wellness-and-travel photography, Blue Fit aesthetic —
-Blue Zones-inspired, premium, calm, aspirational. Natural light (golden hour or
-soft overcast). Authentic real people of varied ages and body types, candid, in
-gentle motion. Open natural settings (open water, riverside, sunrise skies, wide
-landscapes) or clean, light-filled functional training spaces. Colour palette:
-ocean blue, dark blue, light blue, black — ocean blue (NOT navy) leads; cool,
-natural grade. Spacious, unhurried composition. Avoid: hardcore gym / "no excuses"
-tropes, sweat-and-grind intensity, flawless model/influencer physiques, aggressive
-or salesy energy, warm/orange/neon grades, stock-photo cheesiness, on-image text
-unless requested. Instagram portrait, 4:5.
-```
-
-**Video style block (Veo 3.1 Fast) — adds motion/ambiance/audio:**
-```
-[everything above, then:] Camera: slow, smooth, observational movement (gentle
-dolly, drifting handheld, or aerial drift over water). Pace: calm, contemplative.
-Ambient audio: natural sound only (water, wind, birdsong, soft footfalls) — no
-aggressive or hype music. Vertical 9:16.
-```
+The deterministic suffix appended to every generated scene prompt lives in code:
+`app/agents/prompts/style_block.md` (shared base — mascot consistency + look +
+negative list), `style_block_image.md` (still, 9:16) and `style_block_video.md`
+(animate from the provided first frame, one continuous dynamic camera move, one
+beat inside 8 s, upbeat non-aggressive sound design, no speech). Those files are
+the source of truth; see `docs/prompts-changelog.md` for their history.
 
 > Note: the style block is intentionally a **constant** so brand consistency does
 > not depend on the LLM remembering it each run. The generator writes only the
