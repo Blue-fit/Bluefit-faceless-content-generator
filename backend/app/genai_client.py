@@ -24,13 +24,28 @@ from app.tools import ToolError
 logger = structlog.get_logger(__name__)
 
 _TRANSIENT_CODES = {429, 500, 503}
+
+
+def _status(exc: BaseException) -> int | None:
+    """HTTP status of a google-genai error.
+
+    The classic client (`generate_content`, `embed_content`) raises
+    `errors.APIError` with `.code`; the Interactions client (Omni video) raises its
+    own family with `.status_code`. Duck-typing both keeps `with_retry` working for
+    every paid call without importing a private module.
+    """
+    for attr in ("code", "status_code"):
+        value = getattr(exc, attr, None)
+        if isinstance(value, int):
+            return value
+    return None
 _T = TypeVar("_T")
 
 # Canonical model IDs — referenced by tools, agents, and meter/pricing.py.
 MODEL_FLASH = "gemini-2.5-flash"
 MODEL_PRO = "gemini-3.1-pro-preview"
-MODEL_IMAGE = "gemini-3.1-flash-image"  # Nano Banana
-MODEL_VIDEO = "veo-3.1-fast-generate-preview"  # Veo 3.1 Fast
+MODEL_IMAGE = "gemini-3-pro-image"  # Gemini 3 Pro Image (Nano Banana Pro)
+MODEL_VIDEO = "gemini-omni-1.1-flash"  # Gemini Omni Flash — Interactions API (decisions/009)
 MODEL_EMBED = "gemini-embedding-001"  # Developer API; truncated to 768 (pgvector cols)
 
 
@@ -58,8 +73,8 @@ async def with_retry(call: Callable[[], Awaitable[_T]], *, attempts: int = 5) ->
     for attempt in range(1, attempts + 1):
         try:
             return await call()
-        except APIError as exc:
-            code = getattr(exc, "code", None)
+        except Exception as exc:  # noqa: BLE001 — re-raised unless a transient API status
+            code = _status(exc)
             if code in _TRANSIENT_CODES and attempt < attempts:
                 logger.warning("genai.transient_retry", attempt=attempt, code=code, wait_s=delay)
                 await asyncio.sleep(delay)

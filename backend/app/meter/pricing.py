@@ -21,8 +21,10 @@ _PER_MILLION_TOKENS: dict[str, tuple[Decimal, Decimal]] = {
 }
 
 # Flat per-asset costs.
-_PER_IMAGE = Decimal("0.039")  # Nano Banana, per image
-_PER_VIDEO_SECOND = Decimal("0.10")  # Veo 3.1 Fast, per second of 720p output (Google list price)
+_PER_IMAGE = Decimal("0.134")  # Gemini 3 Pro Image, per 1K/2K image (Google list price)
+# Gemini Omni Flash: $17.50 per 1M video-output tokens at ~5,792 tokens per second of
+# 720p ≈ $0.10/s (Google list price). Input tokens for the still are negligible.
+_PER_VIDEO_SECOND = Decimal("0.10")
 
 _MILLION = Decimal(1_000_000)
 

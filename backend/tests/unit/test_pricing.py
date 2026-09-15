@@ -20,7 +20,7 @@ def test_embedding_cost_ignores_output() -> None:
 
 
 def test_image_cost_is_flat() -> None:
-    assert pricing.image_cost() == Decimal("0.039")
+    assert pricing.image_cost() == Decimal("0.134")
 
 
 def test_video_cost_scales_with_seconds() -> None:

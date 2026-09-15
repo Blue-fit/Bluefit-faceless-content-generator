@@ -19,8 +19,8 @@ thing.
 
 | Tool | Wraps | Paid? |
 |---|---|---|
-| `generate_image.py` | Nano Banana (`gemini-2.5-flash-image`) | Yes |
-| `generate_video.py` | Veo 3.1 Fast (`veo-3.1-fast-generate-preview`) | Yes |
+| `generate_image.py` | Gemini 3 Pro Image (`gemini-3-pro-image`) | Yes |
+| `generate_video.py` | Gemini Omni Flash (`gemini-omni-1.1-flash`, Interactions API, image-to-video) | Yes |
 | `generate_caption.py` | Gemini Flash with engagement template | Yes |
 | `edit_post.py` | Dispatches tweak/regenerate/rewrite | Calls paid tools |
 | `brand_rag.py` | pgvector retrieval over `brand_chunks` | No |

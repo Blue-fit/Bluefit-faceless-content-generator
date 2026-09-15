@@ -66,12 +66,12 @@ async def main() -> None:
         )
         name = "office-refs-probe.mp4"
     else:
-        print("Rendering the opening frame with Nano Banana ...")
+        print("Rendering the opening frame with Gemini 3 Pro Image ...")
         still = await render_image(
             build_image_prompt(_SCENE), aspect_ratio="9:16", reference_images=refs
         )
         (OUT / "office-first-frame.jpg").write_bytes(still.image_bytes)
-        print("Animating it with Veo (a few minutes) ...")
+        print("Animating it with Gemini Omni Flash (under a minute) ...")
         result = await render_video(
             prompt,
             aspect_ratio="9:16",

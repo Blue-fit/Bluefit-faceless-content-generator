@@ -1,42 +1,46 @@
-"""Video generation via Veo 3.1 Fast (veo-3.1-fast-generate-preview).
+"""Video generation via Gemini Omni Flash (Interactions API).
 
-`render_video` is the no-DB core: it starts the Veo operation and polls to
-completion (minutes). That blocking poll is fine on Render (long-running); it is
-NOT serverless-safe. `generate_video` is the public @meter-wrapped tool.
+`render_video` is the no-DB core: it starts a background interaction and polls it
+to completion (typically well under a minute). `generate_video` is the public
+@meter-wrapped tool.
 
-Character consistency: the primary path is **image-to-video** — the caller passes
-a mascot still (rendered by Nano Banana with the reference photos) as
-`first_frame`, and Veo animates those pixels, so the mascot in frame 1 is the
-mascot for the whole clip. `reference_images` (Veo "ingredients", ASSET type) is
-implemented as a probe/fallback only: as of 2026-09 the Developer API has been
-reported to accept it only for 16:9 on the non-Fast model, so it is not wired
-into the pipeline until `scripts/run_video.py --refs` proves it at 9:16 on Fast.
+Character consistency: the primary path is **image-to-video** — the caller passes a
+mascot still (rendered by the image model with the reference photos) as
+`first_frame`; Omni animates that exact frame, so the mascot in frame 1 is the
+mascot for the whole clip. `reference_images` maps to Omni's `reference_to_video`
+task (kept for probes; the pipeline uses the first-frame path).
+
+Why Omni over Veo (decisions/009): same ~$0.10/s at 720p, native image-to-video
+that keeps the still pixel-exact as frame 1, works from the EEA with an uploaded
+still, and renders in ~40 s instead of 90 s–6 min. Omni is called through the
+Interactions API, not `generate_videos`; its errors carry `.status_code`, which
+`with_retry` understands.
 
 Per the agreed split, this returns asset **bytes** + metadata; the R2 upload is
-the storage/pipeline layer's job (Jacob's), not this tool's. Intentionally
-deviates from tools/CLAUDE.md ("upload to R2 / don't return bytes").
-
-Note: `generate_audio` is a Vertex-only param (rejected by the Developer API), so
-Veo applies its own default here (3.1 generates audio).
+the storage/pipeline layer's job, not this tool's. Intentionally deviates from
+tools/CLAUDE.md ("upload to R2 / don't return bytes").
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
 from collections.abc import Sequence
+from typing import Any
 
-from google.genai import types
+import httpx
 
 from app.genai_client import MODEL_VIDEO, get_genai_client, with_retry
 from app.meter import MeteredResult, MeterRequest, meter, pricing
 from app.tools import RefImage, ToolError
 
-_POLL_SECONDS = 10
+_POLL_SECONDS = 5
 _DEFAULT_DURATION = 8
-# Veo 3.1 Fast (preview) latency is highly variable (~90s to many minutes). Cap
-# the poll so a stuck operation raises a clear error instead of hanging forever.
+# Omni usually finishes in ~40 s; cap the poll so a stuck interaction raises a clear
+# error instead of hanging forever.
 _TIMEOUT_SECONDS = 360
-_MAX_REFERENCE_IMAGES = 3  # Veo limit for ASSET reference images
+_MAX_REFERENCE_IMAGES = 3
+_PENDING = {"in_progress", "queued", "requires_action"}
 
 
 class VideoRequest(MeterRequest):
@@ -52,8 +56,12 @@ class VideoResult(MeteredResult):
     mime_type: str
 
 
-def _to_image(ref: RefImage) -> types.Image:
-    return types.Image(image_bytes=ref.data, mime_type=ref.mime_type)
+def _image_input(ref: RefImage) -> dict[str, str]:
+    return {
+        "type": "image",
+        "data": base64.b64encode(ref.data).decode(),
+        "mime_type": ref.mime_type,
+    }
 
 
 async def render_video(
@@ -64,57 +72,69 @@ async def render_video(
     first_frame: RefImage | None = None,
     reference_images: Sequence[RefImage] | None = None,
 ) -> VideoResult:
-    """Core Veo render — start the operation, poll to completion. No DB / meter.
+    """Core Omni render — start the interaction, poll to completion. No DB / meter.
 
-    `first_frame` → image-to-video (primary). `reference_images` → Veo ASSET
-    references (probe only). The API rejects the two together, so we do too.
+    `first_frame` → `image_to_video` (primary). `reference_images` →
+    `reference_to_video`. Neither → `text_to_video`. Both together is rejected.
     """
     refs = list(reference_images or ())
     if first_frame is not None and refs:
-        raise ToolError("Veo accepts either a first frame or reference images, not both.")
+        raise ToolError("Omni accepts either a first frame or reference images, not both.")
     if len(refs) > _MAX_REFERENCE_IMAGES:
-        raise ToolError(f"Veo accepts at most {_MAX_REFERENCE_IMAGES} reference images.")
+        raise ToolError(f"Omni accepts at most {_MAX_REFERENCE_IMAGES} reference images.")
+
+    if first_frame is not None:
+        task, images = "image_to_video", [first_frame]
+    elif refs:
+        task, images = "reference_to_video", refs
+    else:
+        task, images = "text_to_video", []
+    inputs: list[dict[str, str]] = [{"type": "text", "text": prompt}]
+    inputs.extend(_image_input(img) for img in images)
 
     client = get_genai_client()
-    config = types.GenerateVideosConfig(
-        number_of_videos=1,
-        duration_seconds=duration_seconds,
-        aspect_ratio=aspect_ratio,
-        reference_images=[
-            types.VideoGenerationReferenceImage(
-                image=_to_image(r), reference_type=types.VideoGenerationReferenceType.ASSET
-            )
-            for r in refs
-        ]
-        or None,
-    )
-    image = _to_image(first_frame) if first_frame is not None else None
-    operation = await with_retry(
-        lambda: client.aio.models.generate_videos(
-            model=MODEL_VIDEO, prompt=prompt, image=image, config=config
+    interaction: Any = await with_retry(
+        lambda: client.aio.interactions.create(
+            model=MODEL_VIDEO,
+            input=inputs,
+            response_modalities=["video"],
+            response_format={
+                "type": "video",
+                "aspect_ratio": aspect_ratio,
+                "duration": f"{duration_seconds}s",
+                "delivery": "inline",
+            },
+            generation_config={"video_config": {"task": task}},
+            background=True,
         )
     )
     waited = 0
-    while not operation.done:
+    while interaction.status in _PENDING:
         if waited >= _TIMEOUT_SECONDS:
             raise ToolError(
-                f"Veo did not finish within {_TIMEOUT_SECONDS}s — the operation is "
+                f"Omni did not finish within {_TIMEOUT_SECONDS}s — the interaction is "
                 "still running or stuck. Try again or shorten the clip."
             )
         await asyncio.sleep(_POLL_SECONDS)
         waited += _POLL_SECONDS
-        operation = await client.aio.operations.get(operation)
+        interaction = await client.aio.interactions.get(interaction.id)
 
-    response = operation.response
-    if response is None or not response.generated_videos:
-        raise ToolError("Veo returned no video.")
-    video = response.generated_videos[0].video
+    if interaction.status != "completed":
+        raise ToolError(f"Omni video {interaction.status}: {interaction.errors}")
+    video = interaction.output_video
     if video is None:
-        raise ToolError("Veo returned no video object.")
+        raise ToolError("Omni returned no video.")
 
-    data = video.video_bytes
-    if data is None:
-        data = await client.aio.files.download(file=video)  # type: ignore[arg-type]
+    if video.data:
+        data = base64.b64decode(video.data)
+    elif video.uri:
+        async with httpx.AsyncClient(timeout=120.0) as http:
+            resp = await http.get(video.uri)
+            resp.raise_for_status()
+            data = resp.content
+    else:
+        raise ToolError("Omni returned a video with neither data nor uri.")
+
     return VideoResult(
         model=MODEL_VIDEO,
         cost_eur=pricing.video_cost(duration_seconds),

@@ -18,7 +18,7 @@ posting. Single-tenant per deployment.
 
 - Python 3.12, async throughout
 - Google ADK for agent orchestration
-- `google-genai` for ALL model calls (Gemini Pro, Flash, Nano Banana, Veo 3.1 Fast)
+- `google-genai` for ALL model calls (Gemini Pro, Flash, Gemini 3 Pro Image, Gemini Omni Flash)
 - FastAPI + uvicorn (single process)
 - APScheduler in-process with persistent jobstore
 - Self-hosted Postgres 16 + pgvector (NOT Supabase — see `docs/decisions/003`)
