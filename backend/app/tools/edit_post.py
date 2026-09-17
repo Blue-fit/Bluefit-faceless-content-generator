@@ -18,7 +18,7 @@ import httpx
 import structlog
 from pydantic import BaseModel
 
-from app.agents.render import render_base
+from app.agents.render import edit_still_text, render_base
 from app.db.connection import get_pool
 from app.db.models import Week
 from app.db.repositories.post_versions import (
@@ -213,21 +213,35 @@ async def _render_asset(
     post_id: UUID,
     scale: float = 1.0,
 ) -> tuple[bytes, bytes, str, str, Decimal]:
-    """Re-render an edited asset (metered, mascot in frame), burn in its hook at `scale`.
+    """Re-render an edited asset (metered, mascot in frame).
 
-    Returns (composited, base, ext, content_type, cost). The base is the
-    pre-overlay original — stored so later text-size edits can keep the image.
-    For video the cost includes the mascot still Veo animates from.
+    Returns (final, base, ext, content_type, cost). Images draw the hook in-picture
+    (final == base). Videos are rendered clean and get the hook overlaid at
+    `scale`; the clean clip is the base kept for later text edits. For video the
+    cost includes the mascot still Omni animates from.
     """
-    asset = await render_base(post_type, scene, motion, post_id=post_id, trigger="edit")
+    asset = await render_base(
+        post_type, scene, motion, post_id=post_id, trigger="edit",
+        hook=hook if post_type == "image" else None,
+    )
     base = asset.data
-    if not hook:
+    if post_type == "image" or not hook:
         data = base
-    elif post_type == "image":
-        data = await overlay_hook_image(base, hook, asset.ext, scale=scale)
     else:
         data = await overlay_hook(base, hook, scale=scale)
     return data, base, asset.ext, asset.content_type, asset.cost_eur
+
+
+def _size_hint(scale: float | None) -> str | None:
+    """Turn a relative text-size edit into words the image model can act on."""
+    if scale is None or scale == 1.0:
+        return None
+    pct = abs(round((1 - scale) * 100))
+    direction = "smaller" if scale < 1 else "larger"
+    return (
+        f"Also make all the on-image text about {pct}% {direction} than it is now, "
+        "keeping it at the top of the picture."
+    )
 
 
 def _ext_ctype(url: str) -> tuple[str, str]:
@@ -344,38 +358,64 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         hook = plan.new_hook if plan.new_hook else blob.get("hook")
 
         base_url: str | None = blob.get("base_asset_url")
-        # Overlay-only: keep the exact media and just re-burn the hook (new words
-        # and/or new size). Skipped for "regenerate" (which wants a fresh take) and
-        # whenever a new scene is given (which needs a full re-render). Treat an
-        # empty-string scene as "no new scene" so a text-only edit stays cheap.
-        overlay_only = (
+        v_next = current.version_number + 1
+        # A text-only edit keeps the exact media: no new scene, not a "regenerate"
+        # (which wants a fresh take), and only the hook words and/or size change.
+        # Treat an empty-string scene as "no new scene" so a text edit stays cheap.
+        text_only = (
             not plan.new_scene_prompt
             and plan.mode != "regenerate"
             and (plan.text_scale is not None or bool(plan.new_hook))
         )
-        v_next = current.version_number + 1
-        if overlay_only and base_url:
-            # Re-overlay the stored base — no regeneration, no generation cost.
-            data, ext, ctype = await _reoverlay_from_base(
-                base_url, post.type, hook, text_scale
-            )
-        else:
-            # Regenerate the asset and store its base so future text edits keep it.
-            data, base, ext, ctype, asset_cost = await _render_asset(
-                post.type, scene, blob.get("motion"), hook, req.post_id,
-                scale=text_scale,
-            )
+        if post.type == "image":
+            # Images carry their typography in-picture (decisions/010): a text edit
+            # re-renders ONLY the text on the stored final (Pro Image edit mode);
+            # anything else is a fresh render with the new hook drawn in.
+            if text_only and base_url and hook:
+                edited = await edit_still_text(
+                    await _fetch_bytes(base_url),
+                    _ext_ctype(base_url)[1],
+                    hook,
+                    post_id=req.post_id,
+                    trigger="edit",
+                    size_hint=_size_hint(plan.text_scale),
+                )
+                data, ext, ctype = edited.data, edited.ext, edited.content_type
+                asset_cost = edited.cost_eur
+            else:
+                data, _, ext, ctype, asset_cost = await _render_asset(
+                    post.type, scene, None, hook, req.post_id
+                )
             cost += asset_cost
-            base_url = await uploader.upload(
-                data=base,
-                key=f"edits/{req.post_id}/v{v_next}-base{ext}",
+            new_asset_url = await uploader.upload(
+                data=data,
+                key=f"edits/{req.post_id}/v{v_next}{ext}",
                 content_type=ctype,
             )
-        new_asset_url = await uploader.upload(
-            data=data,
-            key=f"edits/{req.post_id}/v{v_next}{ext}",
-            content_type=ctype,
-        )
+            base_url = new_asset_url  # for images the final IS the base
+        else:
+            if text_only and base_url:
+                # Video: re-overlay the stored clean clip — no regeneration cost.
+                data, ext, ctype = await _reoverlay_from_base(
+                    base_url, post.type, hook, text_scale
+                )
+            else:
+                # Regenerate the clip and store its clean base for future text edits.
+                data, base, ext, ctype, asset_cost = await _render_asset(
+                    post.type, scene, blob.get("motion"), hook, req.post_id,
+                    scale=text_scale,
+                )
+                cost += asset_cost
+                base_url = await uploader.upload(
+                    data=base,
+                    key=f"edits/{req.post_id}/v{v_next}-base{ext}",
+                    content_type=ctype,
+                )
+            new_asset_url = await uploader.upload(
+                data=data,
+                key=f"edits/{req.post_id}/v{v_next}{ext}",
+                content_type=ctype,
+            )
         # Keep the caption bound to the post. The hook is the bait the caption pays
         # off, and the caption describes the scene — so a new hook or a new scene
         # means the old caption now tells a different story. Re-sync it (cheap Flash)

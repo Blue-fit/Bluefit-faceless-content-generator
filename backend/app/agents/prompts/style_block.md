@@ -8,9 +8,9 @@ other characters. Any club members in frame are adults shown from behind, croppe
 or at a distance — never with a recognisable face. Look: sharp, clean and punchy —
 bright natural or practical light, high contrast, the mascot's ocean blue (NOT navy)
 popping against a real, credible location; cool, natural grade. Composition: the
-mascot is the clear subject, fully in frame; keep the top quarter of the frame as
-clean, uncluttered negative space above its head (on-screen text goes there). Avoid:
+mascot is the clear subject, fully in frame, with open, uncluttered negative space
+above its head. Avoid:
 hardcore gym / "no excuses" tropes, sweat-and-grind intensity, flawless
 model/influencer physiques, aggressive or salesy energy, warm/orange/neon grades,
 stock-photo cheesiness, party props (balloons, confetti), cartoon or anime rendering,
-extra mascots or characters, on-image text or logos.
+extra mascots or characters, logos.

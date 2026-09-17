@@ -1,5 +1,20 @@
 # Prompts changelog
 
+## 2026-09-17
+- `agents/prompts/style_block_typography.md` — created. Appended to IMAGE prompts that
+  carry a hook: the image model renders the typography in-picture — bold deep-blue
+  sans-serif headline with the key word/number on a pale-blue highlight pill, a smaller
+  handwritten caption CTA and a hand-drawn arrow. Words must be exact (a Flash
+  read-back verifies and re-rolls). Reason: the client's own Gemini-made post looked
+  designed; our PIL overlay looked like a sticker (decisions/010).
+- `agents/prompts/style_block_clean_top.md` — created. Appended to a VIDEO's opening
+  frame: top quarter clean, no on-image text (the hook is overlaid after Omni).
+- `agents/prompts/style_block.md` — the "clean top / no on-image text" rules moved out
+  of the shared base into the two tails above (they'd have suppressed the typography).
+- `agents/prompts/generator.md` — `scene_prompt` for images now includes 1–2 short,
+  correctly spelled Dutch text props (chalkboard, tote, whiteboard); video frames carry
+  none. `hook` bullet notes it is rendered in-picture on images, overlaid on video.
+
 ## 2026-09-15
 - `agents/prompts/generator.md` — **the Blue Fit mascot is now the hero of every
   post.** New "The hero" and "Tone: attention-grabbing, not childish" sections

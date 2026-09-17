@@ -47,7 +47,7 @@ from app.meter import MeteredResult, MeterRequest, meter, pricing
 from app.storage import AssetUploader
 from app.tools.brand_rag import BrandRagRequest, brand_rag
 from app.tools.memory_search import MemorySearchRequest, RecentPost, memory_search
-from app.tools.overlay_hook import overlay_hook, overlay_hook_image
+from app.tools.overlay_hook import overlay_hook
 
 logger = structlog.get_logger(__name__)
 
@@ -336,7 +336,12 @@ class _Asset:
 
 
 async def _render(spec: PostSpec, post_id: UUID) -> _Asset:
-    """Render one PostSpec (metered, mascot in frame) and burn in its hook; keep the base."""
+    """Render one PostSpec (metered, mascot in frame).
+
+    Images carry their hook in-picture (model typography, read-back verified), so
+    the render IS the final and the base. Videos are rendered clean and get the
+    hook overlaid; the clean clip is kept as the base for cheap text edits.
+    """
     asset = await render_base(
         spec.type,
         spec.scene_prompt,
@@ -344,12 +349,11 @@ async def _render(spec: PostSpec, post_id: UUID) -> _Asset:
         post_id=post_id,
         trigger="cron",
         duration_seconds=spec.duration_seconds or 8,
+        hook=spec.hook if spec.type == "image" else None,
     )
     base = asset.data
-    if not spec.hook:
+    if spec.type == "image" or not spec.hook:
         data = base
-    elif spec.type == "image":
-        data = await overlay_hook_image(base, spec.hook, asset.ext)
     else:
         data = await overlay_hook(base, spec.hook)
     return _Asset(data, base, asset.model, asset.cost_eur, asset.ext, asset.content_type)
@@ -470,15 +474,20 @@ async def run_weekly(week_start: date, *, uploader: AssetUploader) -> WeekResult
                 )
             asset = await _render(spec, post.id)
             total += asset.cost_eur
-            base_url = await uploader.upload(
-                data=asset.base,
-                key=f"weeks/{week_start}/{post.id}-base{asset.ext}",
-                content_type=asset.content_type,
-            )
             url = await uploader.upload(
                 data=asset.data,
                 key=f"weeks/{week_start}/{post.id}{asset.ext}",
                 content_type=asset.content_type,
+            )
+            # Images: the final is the base (typography is in the picture) — one object.
+            base_url = (
+                url
+                if asset.data == asset.base
+                else await uploader.upload(
+                    data=asset.base,
+                    key=f"weeks/{week_start}/{post.id}-base{asset.ext}",
+                    content_type=asset.content_type,
+                )
             )
             blob = _reasoning_blob(spec, brand.chunk_ids, rule_ids, asset.model, base_url)
             reason = await _embed_reasoning(

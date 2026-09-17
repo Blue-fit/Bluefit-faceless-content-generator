@@ -26,6 +26,7 @@ thing.
 | `brand_rag.py` | pgvector retrieval over `brand_chunks` | No |
 | `memory_search.py` | pgvector over `post_versions.reasoning_embedding` | No |
 | `explain.py` | Flash render of `reasoning_blob` | Yes |
+| `read_image_text.py` | Flash vision transcription of a rendered image (verifies model-rendered typography) | Yes |
 
 ## Asset upload
 

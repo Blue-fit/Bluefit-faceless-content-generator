@@ -102,7 +102,11 @@ For each post, produce a `PostSpec`:
   NOT** write the brand visual style or the mascot's appearance — that is appended
   automatically afterward. Write a vivid, specific scene built from one theme. For
   the **video**, this is the **opening frame** — the setup of the beat; the clip is
-  animated from this exact still.
+  animated from this exact still. **Props with words:** for **images**, include one
+  or two small text props that belong naturally in the setting — a chalkboard sign, a
+  tote bag, a whiteboard, a shirt print — carrying SHORT (2–4 words), correctly spelled
+  Dutch that fits the theme (e.g. *"LOKAAL & SEIZOEN"*, *"GEZONDE KEUZES"*); write
+  the exact words in quotes. The **video** opening frame carries **no** text props.
 - `beat` — **one sentence**: the single scroll-stopping moment. Image: the frozen
   moment itself. Video: what happens inside 8 seconds that pays off the setup.
   **Never null.**
@@ -110,8 +114,11 @@ For each post, produce a `PostSpec`:
   slow orbit, whip-pan reveal) + how the beat pays off; no cuts; the mascot stays in
   frame (otherwise null).
 - `duration_seconds` — **video only**: `8` (otherwise null).
-- `hook` — **every post (image AND video)**: the on-screen text burned onto the top
-  of the asset. It is **two parts in one string, in this order**:
+- `hook` — **every post (image AND video)**: the on-screen text at the top of the
+  asset. On **images** the image model renders it in-picture as designed typography
+  (bold blue headline with a highlighted keyword, handwritten CTA, hand-drawn arrow);
+  on **video** it is overlaid. Same format either way — **two parts in one string,
+  in this order**:
   1. **The hook line** (≤7 words). **Its only job is to grab attention and spark
      curiosity so the viewer opens the caption — it is the bait, not the payoff.** Do
      NOT put the insight or the answer in it; hint that there's something worth
