@@ -17,8 +17,9 @@ Source of the style text: docs/references/brand-style-kit.md.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
+
+from app.tools.hook_text import split_hook
 
 _PROMPTS = Path(__file__).parent / "prompts"
 _STYLE_BASE = (_PROMPTS / "style_block.md").read_text(encoding="utf-8").strip()
@@ -27,25 +28,7 @@ _STYLE_VIDEO = (_PROMPTS / "style_block_video.md").read_text(encoding="utf-8").s
 _STYLE_TYPOGRAPHY = (_PROMPTS / "style_block_typography.md").read_text(encoding="utf-8").strip()
 _STYLE_CLEAN_TOP = (_PROMPTS / "style_block_clean_top.md").read_text(encoding="utf-8").strip()
 
-DEFAULT_CTA = "Lees de caption"
-# Pointer glyphs the generator/overlay use at the end of the CTA; the image model
-# draws its own arrow instead, so they're stripped from the typography text.
-_POINTERS = re.compile(r"[↓⬇\U0001F447️]")
-
-
-def split_hook(hook: str) -> tuple[str, str]:
-    """`'hook line\\nLees de caption 👇'` -> `('hook line', 'Lees de caption')`.
-
-    The first line is the headline; the rest is the caption call-to-action with
-    any arrow/emoji stripped. A single-line hook gets the default CTA — every
-    post must point at its caption.
-    """
-    lines = [ln.strip() for ln in hook.split("\n") if ln.strip()]
-    if not lines:
-        return hook.strip(), DEFAULT_CTA
-    headline = _POINTERS.sub("", lines[0]).strip()
-    cta = _POINTERS.sub("", " ".join(lines[1:])).strip() if len(lines) > 1 else ""
-    return headline, cta or DEFAULT_CTA
+__all__ = ["build_image_prompt", "build_video_prompt", "split_hook", "typography_block"]
 
 
 def typography_block(hook: str) -> str:

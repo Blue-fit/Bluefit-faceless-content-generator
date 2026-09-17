@@ -1,4 +1,5 @@
-"""Hook overlay text layout: line breaks, emoji-aware wrapping, and the no-emoji-font fallback."""
+"""Hook overlay: line breaks, emoji-aware wrapping, the no-emoji-font fallback, and
+the designed video typography (brand-blue headline, pill, handwritten CTA, arrow)."""
 
 import io
 
@@ -25,7 +26,7 @@ def test_wrap_does_not_count_emoji_toward_width() -> None:
 
 def test_runs_split_text_and_emoji() -> None:
     assert _runs(f"Lees de caption {DOWN}") == [("Lees de caption ", False), (DOWN, True)]
-    assert _runs("Lees de caption \u2b07\ufe0f") == [("Lees de caption ", False), ("\u2b07", True)]
+    assert _runs("Lees de caption ⬇️") == [("Lees de caption ", False), ("⬇", True)]
 
 
 def test_emoji_font_is_bundled_and_loads() -> None:
@@ -42,12 +43,47 @@ def test_fallback_to_plain_arrow_without_emoji_font(monkeypatch: pytest.MonkeyPa
     assert canvas.getbbox() is not None
 
 
+# ---- designed typography (what video overlays use) --------------------------------
+
+
 @pytest.mark.asyncio
-async def test_overlay_image_renders_emoji_pixels() -> None:
-    base = Image.new("RGB", (360, 640), (30, 110, 180))
+async def test_overlay_image_renders_designed_typography() -> None:
+    """Blue headline + pale-blue pill on a light image; no emoji drawn."""
+    light = Image.new("RGB", (360, 640), (235, 240, 245))
     buf = io.BytesIO()
-    base.save(buf, "JPEG")
-    out = Image.open(io.BytesIO(await overlay_hook.overlay_hook_image(buf.getvalue(), f"Hook\nLees de caption {DOWN}", ".jpg")))
-    # The pointing-hand emoji is yellow/orange: assert some warm pixels exist (text is white/blue only).
-    px = [p for p in out.convert("RGB").getdata() if p[0] > 200 and 120 < p[1] < 210 and p[2] < 90]
-    assert len(px) > 50
+    light.save(buf, "JPEG")
+    hook = f"Is natuurlijk eten de 80% regel?\nLees de caption {DOWN}"
+    out = Image.open(
+        io.BytesIO(await overlay_hook.overlay_hook_image(buf.getvalue(), hook, ".jpg"))
+    ).convert("RGB")
+    px = list(out.getdata())
+    blue = [p for p in px if p[2] > 150 and p[0] < 80 and p[1] < 140]  # brand-blue text
+    pill = [p for p in px if 200 < p[0] < 225 and 225 < p[1] < 240 and p[2] > 240]
+    assert len(blue) > 300 and len(pill) > 100
+    assert not [p for p in px if p[0] > 200 and 120 < p[1] < 210 and p[2] < 90]  # no emoji
+
+
+def test_designed_layer_flips_to_white_on_a_dark_frame() -> None:
+    dark = Image.new("RGB", (360, 640), (20, 30, 45))
+    layer = overlay_hook.render_designed(dark, "Kop\nLees de caption")
+    top = layer.crop((0, 0, 360, 200)).convert("RGBA").getdata()
+    assert any(p[3] > 200 and p[0] > 240 and p[1] > 240 and p[2] > 240 for p in top)
+
+
+def test_designed_layer_stays_in_the_top_band() -> None:
+    """The block must clear the mascot: nothing drawn below ~30% of the height."""
+    light = Image.new("RGB", (720, 1280), (240, 240, 240))
+    layer = overlay_hook.render_designed(
+        light, f"De beste wellness routine gebeurt gewoon doordeweeks.\nMeer in caption {DOWN}"
+    )
+    bbox = layer.getbbox()
+    assert bbox is not None and bbox[3] <= 1280 * 0.30
+
+
+def test_is_dark_top_threshold() -> None:
+    assert overlay_hook.is_dark_top(Image.new("RGB", (100, 100), (20, 20, 20)))
+    assert not overlay_hook.is_dark_top(Image.new("RGB", (100, 100), (230, 230, 230)))
+    # only the top band matters: dark bottom, light top -> not dark
+    img = Image.new("RGB", (100, 100), (10, 10, 10))
+    img.paste((240, 240, 240), (0, 0, 100, 30))
+    assert not overlay_hook.is_dark_top(img)

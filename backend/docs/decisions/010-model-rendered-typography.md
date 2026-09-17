@@ -24,5 +24,10 @@ as a sticker. A prototype through our own stack matched it first try with every 
   overlay. Video edits are unchanged (overlay on the clean clip).
 - Cost per weekly run: unchanged image calls (+ ~2 cents of read-backs; a re-roll on a
   misspelling costs one extra image). Brand font is the model's, not Montserrat, on images.
-- Known limit: text exactness is verified, but layout/legibility is the model's; the
-  overlay restyle for video (matching hierarchy/pill/arrow) is a follow-up.
+- Known limit: text exactness is verified, but layout/legibility is the model's.
+- **Video overlay restyled to match (same day):** `overlay_hook.render_designed` draws the
+  same language in code — brand-blue Montserrat headline (Caveat handwritten CTA, OFL,
+  bundled), the key word on a pale-blue pill (`hook_text.pick_highlight`), a curved arrow,
+  a soft glow, and a white palette when the frame's top band is dark. The block is kept in
+  the top ~30% so it never collides with the mascot; long headlines auto-shrink. Text stays a
+  static layer, so video text edits remain free and letters never warp under motion.

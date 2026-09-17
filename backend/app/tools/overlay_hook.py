@@ -1,4 +1,11 @@
-"""Burn an attractive hook caption onto images and video clips.
+"""Burn the hook onto images and video clips as designed typography.
+
+The look mirrors what the image model draws in-picture for image posts
+(decisions/010): a bold brand-blue headline with the key word on a pale-blue pill,
+a smaller handwritten call-to-action and a hand-drawn arrow, in the open space at
+the top. Text stays a static graphic layer, so video text edits are free and the
+letters never warp under camera motion. A soft glow keeps it legible; if the top
+of the frame is dark the palette flips to white.
 
 Images: Pillow draws text directly (no ffmpeg font dependency).
 Videos: Pillow renders the text as a transparent PNG overlay; ffmpeg
@@ -17,7 +24,9 @@ import tempfile
 from functools import lru_cache
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+from app.tools.hook_text import pick_highlight, split_hook
 
 _FONT = Path(__file__).resolve().parents[2] / "assets" / "fonts" / "Montserrat-Bold.ttf"
 # Colour-emoji font for the caption call-to-action's pointer (e.g. "Lees de caption
@@ -28,6 +37,10 @@ _EMOJI_FONTS = (
     Path("C:/Windows/Fonts/seguiemj.ttf"),
 )
 _NOTO_STRIKE = 109  # Noto Color Emoji is a CBDT bitmap font: only this size loads
+_SCRIPT_FONT = _FONT.parent / "Caveat-Variable.ttf"  # handwritten CTA (OFL)
+_PILL = (214, 232, 250)          # pale blue behind the highlighted word
+_HEADLINE_MAX_CHARS = 20         # wider lines than the old sticker style
+_DARK_LUMA = 110                 # mean luma of the top band below this -> white text
 _VS16 = "\ufe0f"  # emoji variation selector: never drawn, never counted
 
 _MAX_CHARS = 16
@@ -178,16 +191,132 @@ def _draw_hook(
         y += line_h
 
 
-def _render_overlay_png(
-    width: int, height: int, hook: str, y_frac: float, scale: float = 1.0
-) -> bytes:
-    """Return a transparent RGBA PNG with the hook text drawn on it."""
-    font_size = max(14, int((height // 20) * scale))
-    font = _load_font(font_size)
-    canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    _draw_hook(canvas, _wrap(hook), font, y_frac)
+
+def _load_script_font(size: int) -> ImageFont.FreeTypeFont:
+    """The handwritten CTA font (Caveat Bold); falls back to the brand font."""
+    if not _SCRIPT_FONT.exists():
+        return _load_font(size)
+    font = ImageFont.truetype(str(_SCRIPT_FONT), size)
+    try:
+        font.set_variation_by_name("Bold")
+    except (OSError, ValueError):
+        try:
+            font.set_variation_by_name(b"Bold")
+        except (OSError, ValueError):
+            pass
+    return font
+
+
+def is_dark_top(image: Image.Image, band: float = 0.3) -> bool:
+    """True when the top `band` of the image is dark (mean luma below threshold)."""
+    w, h = image.size
+    top = image.convert("L").crop((0, 0, w, max(1, int(h * band)))).resize((32, 8))
+    return sum(top.getdata()) / (32 * 8) < _DARK_LUMA
+
+
+def _bezier(p0: tuple[float, float], p1: tuple[float, float], p2: tuple[float, float],
+            steps: int = 24) -> list[tuple[float, float]]:
+    pts = []
+    for i in range(steps + 1):
+        t = i / steps
+        x = (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t**2 * p2[0]
+        y = (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t**2 * p2[1]
+        pts.append((x, y))
+    return pts
+
+
+def _draw_arrow(draw: ImageDraw.ImageDraw, start: tuple[float, float], size: int,
+                color: tuple[int, int, int, int]) -> None:
+    """A hand-drawn-looking curved arrow from `start`, sweeping down toward the mascot."""
+    sx, sy = start
+    end = (sx + size * 0.55, sy + size * 1.7)
+    ctrl = (sx + size * 0.95, sy + size * 0.55)
+    pts = _bezier((sx, sy), ctrl, end)
+    width = max(3, size // 13)
+    draw.line(pts, fill=color, width=width, joint="curve")
+    # arrowhead along the final tangent
+    tx, ty = end[0] - pts[-3][0], end[1] - pts[-3][1]
+    norm = max(1e-6, (tx * tx + ty * ty) ** 0.5)
+    tx, ty = tx / norm, ty / norm
+    head = size * 0.42
+    for side in (-1, 1):
+        # rotate the reversed tangent by ~28 degrees to each side
+        c, s_ = 0.883, 0.469 * side
+        vx, vy = (-tx * c - (-ty) * s_), (-ty * c + (-tx) * s_)
+        draw.line([end, (end[0] + vx * head, end[1] + vy * head)], fill=color, width=width)
+
+
+def render_designed(media: Image.Image, hook: str, scale: float = 1.0) -> Image.Image:
+    """Return a transparent RGBA layer the size of `media` with the hook designed on it."""
+    w, h = media.size
+    dark = is_dark_top(media)
+    blue = (30, 110, 180, 255)
+    color = (255, 255, 255, 255) if dark else blue
+    pill_fill = (255, 255, 255, 95) if dark else (*_PILL, 255)
+    glow_color = (0, 0, 0, 150) if dark else (255, 255, 255, 190)
+
+    headline, cta = split_hook(hook)
+    key = pick_highlight(headline)
+    lines = _wrap(headline, _HEADLINE_MAX_CHARS).split("\n")
+    size = max(16, int((h // 26) * scale))
+    if len(lines) > 3:  # a long headline: shrink so the block still clears the mascot
+        size = max(16, int(size * 3 / len(lines)))
+    head_font = _load_font(size)
+    cta_font = _load_script_font(int(size * 1.05))
+    line_h = int(size * 1.12)
+    space = head_font.getlength(" ")
+
+    # ---- layout: (word, x, y, is_key) for the headline
+    layout: list[tuple[str, float, float, bool]] = []
+    y = float(int(h * 0.065))
+    for line in lines:
+        words = line.split(" ")
+        widths = [head_font.getlength(wd) for wd in words]
+        x = (w - (sum(widths) + space * (len(words) - 1))) / 2
+        for wd, ww in zip(words, widths, strict=True):
+            is_key = bool(key) and wd.strip(".,?!:;\"'()").casefold() == key
+            layout.append((wd, x, y, is_key))
+            x += ww + space
+        y += line_h
+    cta_y = y + size * 0.12
+    cta_w = cta_font.getlength(cta)
+    cta_x = (w - cta_w) / 2 - size * 0.55  # nudge left so the arrow fits on the right
+
+    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+
+    # ---- pass 1: glow (text drawn in the glow colour, blurred) for legibility
+    glow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    for wd, x, yy, _ in layout:
+        gd.text((x, yy), wd, font=head_font, fill=glow_color)
+    gd.text((cta_x, cta_y), cta, font=cta_font, fill=glow_color)
+    glow = glow.filter(ImageFilter.GaussianBlur(radius=max(2, size * 0.16)))
+    layer.alpha_composite(glow)
+
+    # ---- pass 2: the highlight pill behind the key word
+    draw = ImageDraw.Draw(layer)
+    pad = size * 0.14
+    for wd, x, yy, is_key in layout:
+        if is_key:
+            ww = head_font.getlength(wd)
+            draw.rounded_rectangle(
+                (x - pad, yy - pad * 0.2, x + ww + pad, yy + size * 1.0 + pad * 0.2),
+                radius=size * 0.55, fill=pill_fill,
+            )
+
+    # ---- pass 3: headline, CTA, arrow
+    for wd, x, yy, _ in layout:
+        draw.text((x, yy), wd, font=head_font, fill=color)
+    draw.text((cta_x, cta_y), cta, font=cta_font, fill=color)
+    _draw_arrow(draw, (cta_x + cta_w + size * 0.4, cta_y + size * 0.5), size, color)
+    return layer
+
+
+def _render_overlay_png(first_frame: Image.Image, hook: str, scale: float = 1.0) -> bytes:
+    """Return a transparent RGBA PNG (frame-sized) with the hook designed on it."""
+    layer = render_designed(first_frame, hook, scale=scale)
     buf = io.BytesIO()
-    canvas.save(buf, format="PNG")
+    layer.save(buf, format="PNG")
     return buf.getvalue()
 
 
@@ -199,12 +328,7 @@ async def overlay_hook_image(
     `scale` multiplies the auto-computed font size (1.0 = default; <1 smaller).
     """
     img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
-    font_size = max(14, int((img.height // 20) * scale))
-    font = _load_font(font_size)
-
-    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    _draw_hook(overlay, _wrap(hook), font, _HOOK_Y_FRAC)
-    composited = Image.alpha_composite(img, overlay)
+    composited = Image.alpha_composite(img, render_designed(img, hook, scale=scale))
 
     out_mode = "RGB" if ext.lower() in (".jpg", ".jpeg") else "RGBA"
     result = composited.convert(out_mode)
@@ -227,25 +351,22 @@ async def overlay_hook(video_bytes: bytes, hook: str, scale: float = 1.0) -> byt
         shutil.copy(_FONT, d / "font.ttf")
         (d / "in.mp4").write_bytes(video_bytes)
 
-        # Get dimensions via ffprobe
-        probe = await asyncio.create_subprocess_exec(
-            "ffprobe", "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=width,height",
-            "-of", "csv=p=0",
-            "in.mp4",
+        # First frame: gives the overlay its exact size and the top-band luma that
+        # decides blue-on-light vs white-on-dark.
+        grab = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-y", "-v", "error", "-i", "in.mp4", "-frames:v", "1", "first.png",
             cwd=d,
-            stdout=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
-        stdout, _ = await probe.communicate()
-        try:
-            w, h = (int(x) for x in stdout.decode().strip().split(","))
-        except ValueError:
-            w, h = 720, 1280  # fallback for 9:16
+        await grab.communicate()
+        first_png = d / "first.png"
+        if first_png.exists():
+            first = Image.open(first_png).convert("RGB")
+        else:
+            first = Image.new("RGB", (720, 1280), (200, 200, 200))  # 9:16 fallback, light
 
-        overlay_png = _render_overlay_png(w, h, hook, y_frac=_HOOK_Y_FRAC, scale=scale)
-        (d / "overlay.png").write_bytes(overlay_png)
+        (d / "overlay.png").write_bytes(_render_overlay_png(first, hook, scale=scale))
 
         # Composite: show the hook for the entire clip
         proc = await asyncio.create_subprocess_exec(
