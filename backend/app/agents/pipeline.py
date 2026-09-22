@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 from uuid import UUID
 
 import asyncpg
@@ -51,6 +51,7 @@ from app.storage import AssetUploader
 from app.tools.brand_rag import BrandRagRequest, brand_rag
 from app.tools.memory_search import MemorySearchRequest, RecentPost, memory_search
 from app.tools.overlay_hook import overlay_hook
+from app.tools.search_demand import SearchDemandResult, search_demand
 
 logger = structlog.get_logger(__name__)
 
@@ -73,6 +74,14 @@ class WeekResult(BaseModel):
 # ---- metered research -------------------------------------------------------
 
 _RESEARCH_MESSAGE = "Produce this week's Blue Fit content themes."
+_DEMAND_HEADING = (
+    "## What our audience is actually struggling with right now\n"
+    "Real Google autocomplete queries (national NL) — the PROBLEMS people are typing,\n"
+    "in their own words, grouped by theme. They are deliberately NOT filtered through\n"
+    "our brand. Your job: take a real problem from this list, decide which pillar and\n"
+    "Power-9 value speaks to it, and build the theme around the SOLUTION Blue Fit can\n"
+    "offer. Skip anything medical, about another gym, or otherwise off-brand.\n\n"
+)
 # Google returns citations as short-lived redirects through this host; they 404
 # within hours, so they must be resolved to the real article NOW, at generation
 # time, or the stored provenance is worthless.
@@ -82,6 +91,7 @@ _RESOLVE_TIMEOUT = 10.0
 
 class _ResearchRequest(MeterRequest):
     week_start: date
+    demand: str = ""
 
 
 class _ResearchResult(MeteredResult):
@@ -147,6 +157,20 @@ async def _resolve_sources(brief: TrendBrief) -> TrendBrief:
     )
 
 
+async def _safe_demand() -> SearchDemandResult:
+    """Mine search demand, degrading to nothing if the endpoint misbehaves.
+
+    `suggestqueries` is undocumented and free; it must never be able to stop a
+    weekly run. With no data the agents fall back to their own judgement, exactly
+    as they did before keyword mining existed.
+    """
+    try:
+        return await search_demand()
+    except Exception as exc:  # noqa: BLE001 — never fatal
+        logger.warning("pipeline.search_demand_failed", error=str(exc)[:160])
+        return SearchDemandResult(queries=[])
+
+
 @meter("research")
 async def _research(req: _ResearchRequest) -> _ResearchResult:
     """Run the researcher and validate its brief, repairing once if malformed.
@@ -159,7 +183,12 @@ async def _research(req: _ResearchRequest) -> _ResearchResult:
     text is passed through (the generator can usually still use it) and the failure
     is logged loudly. A missing week of posts would be worse than a loose brief.
     """
-    run = await _run_agent(build_researcher(), _RESEARCH_MESSAGE, f"wk-{req.week_start}-r")
+    message = (
+        f"{_DEMAND_HEADING}{req.demand}\n\n{_RESEARCH_MESSAGE}"
+        if req.demand
+        else _RESEARCH_MESSAGE
+    )
+    run = await _run_agent(build_researcher(), message, f"wk-{req.week_start}-r")
     in_tokens, out_tokens = run.input_tokens, run.output_tokens
     brief = _parse_brief(run.text, req.week_start)
 
@@ -167,7 +196,7 @@ async def _research(req: _ResearchRequest) -> _ResearchResult:
         logger.info("research.repairing")
         repair = await _run_agent(
             build_researcher(),
-            f"{_RESEARCH_MESSAGE}\n\n## CORRECTION\nYour previous reply was not valid "
+            f"{message}\n\n## CORRECTION\nYour previous reply was not valid "
             "JSON in the required shape. Return ONLY the JSON object described in your "
             'instructions — keys "themes" -> a list of {title, summary, why_relevant, '
             'source_url} — with no prose and no markdown fences.',
@@ -334,6 +363,7 @@ def _generator_message(
     rule_texts: list[str],
     recent: list[RecentPost],
     forbidden_values: frozenset[str] = frozenset(),
+    demand: str = "",
 ) -> str:
     brand = "\n\n---\n\n".join(brand_chunks) if brand_chunks else "(none retrieved)"
     rules = "\n".join(f"- {t}" for t in rule_texts) if rule_texts else "(none)"
@@ -346,8 +376,22 @@ def _generator_message(
     forbidden = (
         ", ".join(sorted(forbidden_values)) if forbidden_values else "(none — first week)"
     )
+    demand_block = (
+        (
+            "## Real search queries to target (what our audience is searching)\n"
+            "These are the audience's own words for their problems — unfiltered by our "
+            "brand. Build each post as the SOLUTION to one of them, told through its "
+            "pillar and Power-9 value and acted out by Bluei. Take the hook/caption "
+            "keyword FROM this list — do not invent one. Skip anything medical, about "
+            "another gym, or off-brand.\n"
+            f"{demand}\n\n"
+        )
+        if demand
+        else ""
+    )
     return (
         f"## This week's themes (from the researcher)\n{themes}\n\n"
+        f"{demand_block}"
         "## Brand context (retrieved from the requirements doc) — use it for VALUES, "
         "VOICE and PILLARS only; ignore any visual/photography/pacing direction in it. "
         "The visual world is fixed by the mascot brief in your instructions.\n"
@@ -593,17 +637,25 @@ async def run_weekly(week_start: date, *, uploader: AssetUploader) -> WeekResult
 
     logger.info("pipeline.start", week_start=str(week_start), week_id=str(week.id))
 
-    # 1. research -> themes (validated into a TrendBrief, metered)
-    research = await _research(_ResearchRequest(trigger="cron", week_start=week_start))
+    # 1. what people are really searching (free, fail-soft), then research
+    demand = await _safe_demand()
+    research = await _research(
+        _ResearchRequest(
+            trigger="cron", week_start=week_start, demand=demand.as_lines()
+        )
+    )
     themes = _strip(research.raw)
     theme_sources = (
         {t.title: t.source_url for t in research.brief.themes} if research.brief else {}
     )
-    brief = (
+    brief: dict[str, Any] = (
         research.brief.model_dump(mode="json")
         if research.brief
         else {"themes_raw": themes}
     )
+    # Keep the week's real search demand next to its themes: it's the evidence for
+    # why these topics, and what the hooks/captions were told to target.
+    brief["search_queries"] = [q.text for q in demand.queries]
     async with pool.acquire() as conn:
         await set_week_brief(conn, week.id, brief)
 
@@ -622,7 +674,12 @@ async def run_weekly(week_start: date, *, uploader: AssetUploader) -> WeekResult
 
     # 3. generate 3 specs grounded in the retrieved context
     message = _generator_message(
-        themes, brand.chunks, [r.text for r in rules], recent.versions, forbidden
+        themes,
+        brand.chunks,
+        [r.text for r in rules],
+        recent.versions,
+        forbidden,
+        demand.as_lines(),
     )
     generated = await _generate(
         _GenerateRequest(trigger="cron", message=message, session_id=f"wk-{week_start}-g")

@@ -44,6 +44,10 @@ class TrendTheme(BaseModel):
     summary: str = Field(description="What the theme is, in 1-2 sentences.")
     why_relevant: str = Field(description="Why it fits Blue Fit / its pillars.")
     source_url: str = Field(description="Where the theme was found.")
+    search_query: str | None = Field(
+        default=None,
+        description="The real search query this theme answers, verbatim (if any).",
+    )
 
 
 class TrendBrief(BaseModel):

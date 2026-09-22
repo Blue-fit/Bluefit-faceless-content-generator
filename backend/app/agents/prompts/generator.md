@@ -135,11 +135,13 @@ For each post, produce a `PostSpec`:
      characters** and **vary them** across the 3 posts so it never feels robotic:
      *Lees de caption 👇*, *Meer in caption 👇*, *Lees verder 👇*, *Antwoord 👇*.
   Example of the full string (note the line break): *"Waarom 'sporten' mensen in Blue
-  Zones nooit?\nLees de caption 👇"*. **Weave one searchable Instagram keyword**
-  into the hook line naturally
-  (a Dutch term the wellness audience actually types — *hydratatie*, *natuurlijk
-  bewegen*, *wellness routine*, *gezond eten*, *Blue Zones* — tied to this post's
-  pillar/theme/value) so the on-screen text doubles as discovery ("Instagram SEO"). It
+  Zones nooit?\nLees de caption 👇"*. **Weave one searchable keyword into the hook
+  line naturally.** When the message carries a *"Real search queries to target"*
+  section, that keyword **must come from those queries** — they are phrases people
+  actually type, and the post exists to answer one of them. Only when no queries are
+  supplied may you fall back to a Dutch term the audience plausibly types
+  (*hydratatie*, *natuurlijk bewegen*, *gezond eten*). Either way it doubles as
+  discovery ("Instagram SEO"). It
   must read as part of the line, never a keyword list, and must not kill the curiosity
   gap. Punchy, confident, on-brand — never hype or "no excuses". Never null.
 - `caption_template` — `"question"`, `"hottake"`, or `"observation"`; pick what

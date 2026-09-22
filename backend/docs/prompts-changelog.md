@@ -1,5 +1,22 @@
 # Prompts changelog
 
+## 2026-09-22
+- **New: `tools/search_demand.py`** mines Google autocomplete (national NL, free, no
+  key) for the PROBLEMS the audience types, in their own words. Seeds are everyday
+  Dutch ("altijd moe", "geen tijd om te sporten") and deliberately NOT derived from
+  the pillars/values — the brand lens is applied afterwards. City seeds were dropped
+  ("fitness lent nijmegen" returns 1 suggestion and caps reach). Results are ranked
+  per topic and interleaved so no single topic floods the list, with medical,
+  competitor and price queries filtered out. Fail-soft: no data = the old behaviour.
+- `agents/prompts/researcher.md` — now works problem → pillar/value → **solution**:
+  pick a real searched problem, match the value that speaks to it, build the theme
+  around the solution Bluei can act out, and record the query in `search_query`
+  (new optional `TrendTheme.search_query`; additive, no SCHEMA_VERSION bump).
+  `google_search` becomes evidence-finding rather than topic-finding.
+- `agents/prompts/generator.md` — the hook/caption keyword must be taken FROM the
+  mined queries rather than invented. Reason: client wants posts built on what the
+  audience actually searches, to maximise views.
+
 ## 2026-09-17
 - `agents/prompts/style_block_typography.md` — created. Appended to IMAGE prompts that
   carry a hook: the image model renders the typography in-picture — bold deep-blue
