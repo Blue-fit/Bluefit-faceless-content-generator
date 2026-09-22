@@ -104,6 +104,8 @@ _PHRASES: dict[str, dict[str, str]] = {
         "photo": "photo", "video": "video",
         "new_media": "made a new {media}",
         "set_hook": 'set the on-screen text to "{hook}"',
+        "resized_smaller": "made the on-screen text smaller",
+        "resized_bigger": "made the on-screen text bigger",
         "caption_match": "rewrote the caption to match",
         "caption": "rewrote the caption",
         "kept_media_and_hook": "the {media} and its on-screen text are unchanged",
@@ -123,6 +125,8 @@ _PHRASES: dict[str, dict[str, str]] = {
         "photo": "foto", "video": "video",
         "new_media": "een nieuwe {media} gemaakt",
         "set_hook": 'de tekst in beeld gewijzigd naar "{hook}"',
+        "resized_smaller": "de tekst in beeld kleiner gemaakt",
+        "resized_bigger": "de tekst in beeld groter gemaakt",
         "caption_match": "de caption daarop aangepast",
         "caption": "de caption herschreven",
         "kept_media_and_hook": "de {media} en de tekst in beeld zijn ongewijzigd",
@@ -150,6 +154,7 @@ def summarise_edit(
     caption_changed: bool,
     caption_followed_asset: bool,
     version_number: int,
+    text_resized: float | None = None,  # <1 smaller, >1 bigger
     language: str = "en",
 ) -> str:
     """Say what actually changed, and what did not, in the client's own language.
@@ -164,16 +169,24 @@ def summarise_edit(
     kept: list[str] = []
 
     hook_changed = bool(hook_after) and hook_after != hook_before
+    # A size change rewrites the asset without touching the wording, so it has to
+    # be reported on its own or the reply claims nothing happened.
+    resized = text_resized is not None and text_resized != 1.0
     if media_rerendered:
         did.append(p["new_media"].format(media=media))
     if hook_changed:
         first_line = (hook_after or "").splitlines()[0].strip() if hook_after else ""
         did.append(p["set_hook"].format(hook=first_line))
-    elif not media_rerendered:
+    if resized:
+        did.append(p["resized_smaller"] if (text_resized or 1) < 1 else p["resized_bigger"])
+
+    # Exactly one reassurance about the media, or they contradict each other.
+    text_touched = hook_changed or resized
+    if not media_rerendered and not text_touched:
         kept.append(p["kept_media_and_hook"].format(media=media))
-    if media_rerendered and not hook_changed:
+    elif media_rerendered and not text_touched:
         kept.append(p["kept_hook"])
-    if not media_rerendered and hook_changed:
+    elif not media_rerendered:
         kept.append(p["kept_media"].format(media=media))
 
     if caption_changed:
@@ -665,6 +678,7 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         caption_changed=(new_caption or "") != (current.caption or ""),
         caption_followed_asset=caption_followed_asset,
         version_number=version.version_number,
+        text_resized=plan.text_scale if wants_asset else None,
         language=plan.language,
     )
     return EditResult(

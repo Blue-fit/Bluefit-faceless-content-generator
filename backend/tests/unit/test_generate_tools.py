@@ -58,18 +58,24 @@ async def test_image_with_refs_sends_text_then_image_parts(
 
 
 class _FakeInteractions:
-    """Fake `client.aio.interactions`: records create() kwargs, completes on first get()."""
+    """Fake `client.aio.interactions`: create() returns a COMPLETED interaction.
+
+    The real client is called synchronously — `interactions.get()` polling is not
+    used because every get() 400s with "API key not valid" on the Developer API.
+    """
 
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
     async def create(self, **kwargs: Any) -> Any:
         self.calls.append(kwargs)
-        return SimpleNamespace(id="ix-1", status="in_progress", errors=None, output_video=None)
+        video = SimpleNamespace(
+            data=base64.b64encode(b"mp4").decode(), uri=None, mime_type="video/mp4"
+        )
+        return SimpleNamespace(id="ix-1", status="completed", errors=None, output_video=video)
 
-    async def get(self, _id: str) -> Any:
-        video = SimpleNamespace(data=base64.b64encode(b"mp4").decode(), uri=None, mime_type="video/mp4")
-        return SimpleNamespace(id=_id, status="completed", errors=None, output_video=video)
+    async def get(self, _id: str) -> Any:  # pragma: no cover - must never be called
+        raise AssertionError("interactions.get() 400s on the Developer API; do not poll")
 
 
 @pytest.fixture
@@ -77,7 +83,6 @@ def interactions(monkeypatch: pytest.MonkeyPatch) -> _FakeInteractions:
     fake = _FakeInteractions()
     client = SimpleNamespace(aio=SimpleNamespace(interactions=fake))
     monkeypatch.setattr(generate_video, "get_genai_client", lambda: client)
-    monkeypatch.setattr(generate_video, "_POLL_SECONDS", 0)
     return fake
 
 
@@ -119,3 +124,16 @@ async def test_video_rejects_both_and_too_many(interactions: _FakeInteractions) 
     with pytest.raises(ToolError):
         await generate_video.render_video("m", reference_images=[_REF] * 4)
     assert interactions.calls == []
+
+
+@pytest.mark.asyncio
+async def test_video_never_polls_and_asks_for_the_clip_inline(
+    interactions: _FakeInteractions,
+) -> None:
+    """Polling was the bug: interactions.get() 400s even when create() succeeds."""
+    await generate_video.render_video("motion", first_frame=_REF)
+
+    call = interactions.calls[0]
+    assert "background" not in call  # background+get was the broken path
+    assert call["response_format"]["delivery"] == "inline"
+    assert call["timeout"] == generate_video._TIMEOUT_SECONDS
