@@ -10,6 +10,7 @@ metered production twin.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ from typing import NamedTuple
 from uuid import UUID
 
 import asyncpg
+import httpx
 import structlog
 from google.adk.agents import LlmAgent
 from google.adk.runners import InMemoryRunner
@@ -71,6 +73,11 @@ class WeekResult(BaseModel):
 # ---- metered research -------------------------------------------------------
 
 _RESEARCH_MESSAGE = "Produce this week's Blue Fit content themes."
+# Google returns citations as short-lived redirects through this host; they 404
+# within hours, so they must be resolved to the real article NOW, at generation
+# time, or the stored provenance is worthless.
+_GROUNDING_HOST = "vertexaisearch.cloud.google.com"
+_RESOLVE_TIMEOUT = 10.0
 
 
 class _ResearchRequest(MeterRequest):
@@ -100,6 +107,44 @@ def _parse_brief(text: str, week_start: date) -> TrendBrief | None:
     except ValidationError as exc:
         logger.warning("research.invalid_brief", error=str(exc)[:300])
         return None
+
+
+async def _resolve_source(client: httpx.AsyncClient, url: str) -> str:
+    """The article a grounding redirect points at (the original URL on failure).
+
+    A 4xx from the publisher still redirects first, so the final URL is usable even
+    when the page itself refuses our request.
+    """
+    try:
+        resp = await client.get(url)
+    except httpx.HTTPError as exc:
+        logger.warning("research.source_unresolved", url=url[:80], error=str(exc)[:120])
+        return url
+    final = str(resp.url)
+    return url if _GROUNDING_HOST in final else final
+
+
+async def _resolve_sources(brief: TrendBrief) -> TrendBrief:
+    """Replace grounding redirects in `brief` with the real article URLs.
+
+    Best-effort and never fatal: a theme keeps its redirect if resolution fails.
+    """
+    targets = sorted({t.source_url for t in brief.themes if _GROUNDING_HOST in t.source_url})
+    if not targets:
+        return brief
+    async with httpx.AsyncClient(follow_redirects=True, timeout=_RESOLVE_TIMEOUT) as client:
+        resolved = await asyncio.gather(*(_resolve_source(client, u) for u in targets))
+    mapping = dict(zip(targets, resolved, strict=True))
+    logger.info("research.sources_resolved", resolved=sum(1 for u in targets if mapping[u] != u),
+                total=len(targets))
+    return brief.model_copy(
+        update={
+            "themes": [
+                t.model_copy(update={"source_url": mapping.get(t.source_url, t.source_url)})
+                for t in brief.themes
+            ]
+        }
+    )
 
 
 @meter("research")
@@ -136,11 +181,36 @@ async def _research(req: _ResearchRequest) -> _ResearchResult:
         else:
             logger.warning("research.brief_unvalidated", raw=run.text[:200])
 
+    if brief is not None:
+        brief = await _resolve_sources(brief)
     return _ResearchResult(
         model=MODEL_FLASH,
         cost_eur=pricing.text_cost(MODEL_FLASH, in_tokens, out_tokens),
         brief=brief,
         raw=run.text,
+    )
+
+
+# ---- metered generation -----------------------------------------------------
+
+
+class _GenerateRequest(MeterRequest):
+    message: str
+    session_id: str
+
+
+class _GenerateResult(MeteredResult):
+    text: str
+
+
+@meter("generation")
+async def _generate(req: _GenerateRequest) -> _GenerateResult:
+    """One generator turn, priced from its real token counts."""
+    run = await _run_agent(build_generator(), req.message, req.session_id)
+    return _GenerateResult(
+        model=MODEL_PRO,
+        cost_eur=pricing.text_cost(MODEL_PRO, run.input_tokens, run.output_tokens),
+        text=run.text,
     )
 
 
@@ -346,7 +416,7 @@ def _value_rule_violations(out: GeneratorOutput, forbidden: frozenset[str]) -> l
 
 async def _enforce_value_rules(
     out: GeneratorOutput, forbidden: frozenset[str], base_message: str, week_start: date
-) -> GeneratorOutput:
+) -> tuple[GeneratorOutput, Decimal]:
     """Re-prompt once if the week breaks the value/pillar anchor rule.
 
     Runs before any rendering, so no asset spend is wasted. Best-effort: if the
@@ -355,24 +425,26 @@ async def _enforce_value_rules(
     """
     problems = _value_rule_violations(out, forbidden)
     if not problems:
-        return out
+        return out, Decimal(0)
     logger.info("pipeline.value_rule_violation", problems=problems)
     correction = (
         f"{base_message}\n\n## CORRECTION\nYour 3 posts break the weekly anchor rule: "
         f"{'; '.join(problems)}. Regenerate all 3 posts so they use 3 DIFFERENT Power-9 "
         "values and 3 DIFFERENT pillars, and use NONE of the forbidden values."
     )
+    gen = await _generate(
+        _GenerateRequest(trigger="cron", message=correction, session_id=f"wk-{week_start}-v2")
+    )
     try:
-        retried = GeneratorOutput.model_validate_json(
-            _strip((await _run_agent(build_generator(), correction, f"wk-{week_start}-v2")).text)
-        )
+        retried = GeneratorOutput.model_validate_json(_strip(gen.text))
     except Exception:  # noqa: BLE001 — rule retry is best-effort, never fatal
         logger.warning("pipeline.value_rule_retry_failed", problems=problems)
-        return out
+        return out, gen.cost_eur
     remaining = _value_rule_violations(retried, forbidden)
     if remaining:
         logger.warning("pipeline.value_rule_unresolved", problems=remaining)
-    return retried if len(remaining) <= len(problems) else out
+    best = retried if len(remaining) <= len(problems) else out
+    return best, gen.cost_eur
 
 
 def _prompt_version() -> str:
@@ -463,7 +535,7 @@ async def _enforce_scene_variety(
     recent_families: set[str],
     base_message: str,
     week_start: date,
-) -> GeneratorOutput:
+) -> tuple[GeneratorOutput, Decimal]:
     """Re-prompt once if the video reuses a recent visual setting (e.g. ocean).
 
     The video is the worst repeat offender, so we hard-guard it: if its setting
@@ -474,10 +546,10 @@ async def _enforce_scene_variety(
     """
     video = next((p for p in out.posts if p.type == "video"), None)
     if video is None:
-        return out
+        return out, Decimal(0)
     family = _scene_family(video.scene_prompt)
     if family == "other" or family not in recent_families:
-        return out
+        return out, Decimal(0)
 
     logger.info("pipeline.scene_repeat", family=family, scene=video.scene_prompt[:80])
     banned = ", ".join(sorted(recent_families | {family}))
@@ -487,19 +559,20 @@ async def _enforce_scene_variety(
         "the video MUST use a completely different setting — do NOT use any of: "
         f"{banned}."
     )
+    gen = await _generate(
+        _GenerateRequest(trigger="cron", message=correction, session_id=f"wk-{week_start}-g2")
+    )
     try:
-        retried = GeneratorOutput.model_validate_json(
-            _strip((await _run_agent(build_generator(), correction, f"wk-{week_start}-g2")).text)
-        )
+        retried = GeneratorOutput.model_validate_json(_strip(gen.text))
     except Exception:  # noqa: BLE001 — variety retry is best-effort, never fatal
         logger.warning("pipeline.scene_repeat_retry_failed", family=family)
-        return out
+        return out, gen.cost_eur
     new_video = next((p for p in retried.posts if p.type == "video"), None)
     if new_video is None:
-        return out
+        return out, gen.cost_eur
     if _scene_family(new_video.scene_prompt) in recent_families:
         logger.warning("pipeline.scene_repeat_unresolved", family=family)
-    return retried
+    return retried, gen.cost_eur
 
 
 # ---- entry point ------------------------------------------------------------
@@ -551,13 +624,16 @@ async def run_weekly(week_start: date, *, uploader: AssetUploader) -> WeekResult
     message = _generator_message(
         themes, brand.chunks, [r.text for r in rules], recent.versions, forbidden
     )
-    out = GeneratorOutput.model_validate_json(
-        _strip((await _run_agent(build_generator(), message, f"wk-{week_start}-g")).text)
+    generated = await _generate(
+        _GenerateRequest(trigger="cron", message=message, session_id=f"wk-{week_start}-g")
     )
-    out = await _enforce_value_rules(out, forbidden, message, week_start)
-    out = await _enforce_scene_variety(
+    total += generated.cost_eur
+    out = GeneratorOutput.model_validate_json(_strip(generated.text))
+    out, value_retry_cost = await _enforce_value_rules(out, forbidden, message, week_start)
+    out, scene_retry_cost = await _enforce_scene_variety(
         out, _recent_scene_families(recent.versions), message, week_start
     )
+    total += value_retry_cost + scene_retry_cost
 
     # 4. render images first, video last; isolate each post so one failure survives
     specs = sorted(out.posts, key=lambda s: s.type == "video")

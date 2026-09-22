@@ -36,7 +36,8 @@ logger = structlog.get_logger(__name__)
 # Mirror the CHECK constraints on the `usage` table (migration 001).
 Trigger = Literal["cron", "edit", "explain", "ingest"]
 CallType = Literal[
-    "image", "video", "caption", "edit", "research", "explain", "embedding", "extraction"
+    "image", "video", "caption", "edit", "research", "generation",
+    "explain", "embedding", "extraction",
 ]
 
 # PRD D4 default. TODO: source the cap from brand/profile.yaml (hard_cap_eur).
