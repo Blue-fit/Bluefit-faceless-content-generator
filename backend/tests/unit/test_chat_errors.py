@@ -55,11 +55,36 @@ def test_spend_cap_is_handled_separately_from_unknown_errors() -> None:
 
 def test_every_failure_reply_says_the_post_is_untouched() -> None:
     """The client could never tell whether a failed edit had half-applied."""
-    import inspect
-    import re
+    for language, messages in chat._FAILURES.items():
+        for kind, text in messages.items():
+            reassures = (
+                "not changed" in text
+                or "is unchanged" in text
+                or "niet gewijzigd" in text
+                or "ongewijzigd" in text
+            )
+            assert reassures, f"{language}/{kind} does not say the post is untouched"
 
-    # join adjacent string literals so wrapped messages read as one line
-    source = re.sub(r'"\s+"', "", inspect.getsource(chat.chat))
-    reassurances = source.count("not changed") + source.count("is unchanged")
-    # spend cap, quota, upstream-busy, unknown, ToolError, EditError
-    assert reassurances >= 6, f"only {reassurances} failure replies reassure the client"
+
+def test_both_languages_cover_every_failure_kind() -> None:
+    """A missing Dutch key would raise mid-failure — the worst possible moment."""
+    assert set(chat._FAILURES["nl"]) == set(chat._FAILURES["en"])
+
+
+def test_dutch_is_detected_from_the_client_s_own_messages() -> None:
+    for dutch in (
+        "er veranderd niks in de post",
+        "maak de tekst kleiner en dat het beter past in de foto",
+        "verwijs hierin meer naar de blue zones. ook in de caption",
+        "een andere tekst ook in de video",
+    ):
+        assert chat.reply_language(dutch) == "nl", dutch
+
+
+def test_english_stays_english() -> None:
+    for english in (
+        "make the text smaller",
+        "change the caption to something shorter",
+        "what went wrong?",
+    ):
+        assert chat.reply_language(english) == "en", english

@@ -44,6 +44,10 @@ _HARD_LIMIT = 10  # PRD §4.4: hard-block unless overridden
 class EditError(RuntimeError):
     """Raised on an invalid edit (missing post, version limit reached, bad plan)."""
 
+    def __init__(self, message: str, language: str = "en") -> None:
+        super().__init__(message)
+        self.language = language
+
 
 class EditNeedsClarification(RuntimeError):
     """The instruction was too vague (or not an edit) — ask before changing anything.
@@ -74,6 +78,8 @@ class EditPlan(BaseModel):
     text_scale: float | None = None
     # Set INSTEAD of a plan when the request is too vague or is a question.
     clarify: str | None = None
+    # ISO 639-1 code of the request, so the reply speaks the client's language.
+    language: str = "en"
 
     @field_validator("mode", "targets", mode="before")
     @classmethod
@@ -90,6 +96,51 @@ class EditPlan(BaseModel):
         return "tweak" if info.field_name == "mode" else []
 
 
+# Reply phrasing per language. The client writes Dutch, so answering in English made
+# the thread feel like a machine; `EditPlan.language` carries what they used.
+# Anything we have no phrasing for falls back to English rather than guessing.
+_PHRASES: dict[str, dict[str, str]] = {
+    "en": {
+        "photo": "photo", "video": "video",
+        "new_media": "made a new {media}",
+        "set_hook": 'set the on-screen text to "{hook}"',
+        "caption_match": "rewrote the caption to match",
+        "caption": "rewrote the caption",
+        "kept_media_and_hook": "the {media} and its on-screen text are unchanged",
+        "kept_hook": "the on-screen text is unchanged",
+        "kept_media": "the {media} itself is untouched",
+        "kept_caption": "the caption is unchanged",
+        "done": "Done — I {done}.",
+        "and": " and ",
+        "version": " This is version {n}.",
+        "nothing": (
+            "I could not change anything on this post (still version {n}). Tell me "
+            "specifically what to change — the caption, the text in the image, or "
+            "the {media} itself."
+        ),
+    },
+    "nl": {
+        "photo": "foto", "video": "video",
+        "new_media": "een nieuwe {media} gemaakt",
+        "set_hook": 'de tekst in beeld gewijzigd naar "{hook}"',
+        "caption_match": "de caption daarop aangepast",
+        "caption": "de caption herschreven",
+        "kept_media_and_hook": "de {media} en de tekst in beeld zijn ongewijzigd",
+        "kept_hook": "de tekst in beeld is ongewijzigd",
+        "kept_media": "de {media} zelf is ongewijzigd",
+        "kept_caption": "de caption is ongewijzigd",
+        "done": "Klaar — ik heb {done}.",
+        "and": " en ",
+        "version": " Dit is versie {n}.",
+        "nothing": (
+            "Ik heb niets kunnen wijzigen aan deze post (nog steeds versie {n}). Zeg "
+            "precies wat ik moet aanpassen — de caption, de tekst in beeld, of de "
+            "{media} zelf."
+        ),
+    },
+}
+
+
 def summarise_edit(
     *,
     post_type: str,
@@ -99,49 +150,44 @@ def summarise_edit(
     caption_changed: bool,
     caption_followed_asset: bool,
     version_number: int,
+    language: str = "en",
 ) -> str:
-    """Say what actually changed, and what did not.
+    """Say what actually changed, and what did not, in the client's own language.
 
     The old reply ("tweak applied to the asset") left the client guessing whether
     both halves of their request landed and whether the picture had been replaced.
     Built from facts rather than a model call: free, instant and always true.
     """
-    media = "video" if post_type == "video" else "photo"
+    p = _PHRASES.get(language.lower()[:2], _PHRASES["en"])
+    media = p["video"] if post_type == "video" else p["photo"]
     did: list[str] = []
     kept: list[str] = []
 
     hook_changed = bool(hook_after) and hook_after != hook_before
     if media_rerendered:
-        did.append(f"made a new {media}")
+        did.append(p["new_media"].format(media=media))
     if hook_changed:
         first_line = (hook_after or "").splitlines()[0].strip() if hook_after else ""
-        did.append(f'set the on-screen text to "{first_line}"')
+        did.append(p["set_hook"].format(hook=first_line))
     elif not media_rerendered:
-        kept.append(f"the {media} and its on-screen text are unchanged")
+        kept.append(p["kept_media_and_hook"].format(media=media))
     if media_rerendered and not hook_changed:
-        kept.append("the on-screen text is unchanged")
+        kept.append(p["kept_hook"])
     if not media_rerendered and hook_changed:
-        kept.append(f"the {media} itself is untouched")
+        kept.append(p["kept_media"].format(media=media))
 
     if caption_changed:
-        did.append(
-            "rewrote the caption to match" if caption_followed_asset
-            else "rewrote the caption"
-        )
+        did.append(p["caption_match"] if caption_followed_asset else p["caption"])
     else:
-        kept.append("the caption is unchanged")
+        kept.append(p["kept_caption"])
 
     if not did:  # nothing to report would be the vaguest answer of all
-        return (
-            f"I could not change anything on this post (still version {version_number}). "
-            "Tell me specifically what to change — the caption, the text in the image, "
-            f"or the {media} itself."
-        )
-    done = did[0] if len(did) == 1 else ", ".join(did[:-1]) + f" and {did[-1]}"
-    reply = f"Done — I {done}."
+        return p["nothing"].format(n=version_number, media=media)
+    done = did[0] if len(did) == 1 else ", ".join(did[:-1]) + p["and"] + did[-1]
+    reply = p["done"].format(done=done)
     if kept:
         reply += " " + (kept[0] if len(kept) == 1 else "; ".join(kept)).capitalize() + "."
-    return reply + f" This is version {version_number}."
+    return reply + p["version"].format(n=version_number)
 
 
 class EditRequest(BaseModel):
@@ -176,6 +222,8 @@ Decide:
   beter en ook de caption", "maak een nieuwe post en een nieuwe caption",
   "verwijs meer naar de blue zones, ook in de caption" -> ["asset","caption"].
   Never silently drop half of what was asked. When in doubt, include "asset".
+- "language": the ISO 639-1 code of the language the REQUEST is written in
+  ("nl" for Dutch, "en" for English, ...). The reply is written in that language.
 - "clarify": use this INSTEAD of guessing. If the request is too vague to act on
   ("dit kan echt beter", "maak het mooier", "niet goed"), or is a QUESTION rather
   than an instruction ("wat is er verkeerd gegaan?", "waarom is dit zo?"), return
@@ -225,7 +273,7 @@ Decide:
   pre-mascot weeks) show people or scenery instead.
 
 Return exactly the keys:
-{"targets","mode","new_scene_prompt","new_hook","caption_template","caption_instruction","text_scale","clarify"}"""
+{"targets","mode","new_scene_prompt","new_hook","caption_template","caption_instruction","text_scale","clarify","language"}"""
 
 
 # ---- "make this like week N" reference resolution ---------------------------
@@ -617,6 +665,7 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         caption_changed=(new_caption or "") != (current.caption or ""),
         caption_followed_asset=caption_followed_asset,
         version_number=version.version_number,
+        language=plan.language,
     )
     return EditResult(
         version_id=version.id,

@@ -1,6 +1,9 @@
 # Prompts changelog
 
 ## 2026-09-22 (b) - edit fixes from a production audit
+- `tools/edit_post.py` `_CLASSIFY` - new "language": the classifier reports the ISO code
+  of the request so every reply is written in the language the client is using. The
+  client writes Dutch and was being answered in English.
 - `tools/edit_post.py` `_CLASSIFY` - `clarify` also covers messages that are NOT change
   requests: praise ("Deze is nu erg mooi en heb ik gebruikt!"), bare commands with no
   object ("doe het", "fix het"), and complaints ("er verandert niks in de post"). All
