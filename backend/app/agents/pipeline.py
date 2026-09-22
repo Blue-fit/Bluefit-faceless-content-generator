@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from typing import NamedTuple
 from uuid import UUID
 
 import asyncpg
@@ -23,13 +24,13 @@ import structlog
 from google.adk.agents import LlmAgent
 from google.adk.runners import InMemoryRunner
 from google.genai import types
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.agents.generator import build_generator
 from app.agents.mascot import mascot_refs_version
 from app.agents.render import render_base
 from app.agents.researcher import build_researcher
-from app.agents.schemas import SCHEMA_VERSION, GeneratorOutput, PostSpec
+from app.agents.schemas import SCHEMA_VERSION, GeneratorOutput, PostSpec, TrendBrief
 from app.db.connection import get_pool
 from app.db.repositories.brand_chunks import count_chunks
 from app.db.repositories.post_versions import get_version, insert_version
@@ -67,6 +68,82 @@ class WeekResult(BaseModel):
     status: str
 
 
+# ---- metered research -------------------------------------------------------
+
+_RESEARCH_MESSAGE = "Produce this week's Blue Fit content themes."
+
+
+class _ResearchRequest(MeterRequest):
+    week_start: date
+
+
+class _ResearchResult(MeteredResult):
+    brief: TrendBrief | None  # None when the researcher never returned valid JSON
+    raw: str  # the text handed to retrieval + the generator either way
+
+
+def _parse_brief(text: str, week_start: date) -> TrendBrief | None:
+    """Validate the researcher's JSON into a `TrendBrief` (None if it doesn't fit).
+
+    The researcher doesn't know the week, so `week_start` is supplied here.
+    """
+    try:
+        data = json.loads(_strip(text))
+    except json.JSONDecodeError:
+        return None
+    if isinstance(data, list):
+        data = {"themes": data}
+    if not isinstance(data, dict):
+        return None
+    try:
+        return TrendBrief.model_validate({**data, "week_start": data.get("week_start") or week_start})
+    except ValidationError as exc:
+        logger.warning("research.invalid_brief", error=str(exc)[:300])
+        return None
+
+
+@meter("research")
+async def _research(req: _ResearchRequest) -> _ResearchResult:
+    """Run the researcher and validate its brief, repairing once if malformed.
+
+    Metered from the agent's real token counts. Note: `google_search` grounding is
+    billed separately by Google and is not captured here — this records the model
+    tokens, which is what our pricing table covers.
+
+    A brief that is still invalid after the repair does NOT fail the week: the raw
+    text is passed through (the generator can usually still use it) and the failure
+    is logged loudly. A missing week of posts would be worse than a loose brief.
+    """
+    run = await _run_agent(build_researcher(), _RESEARCH_MESSAGE, f"wk-{req.week_start}-r")
+    in_tokens, out_tokens = run.input_tokens, run.output_tokens
+    brief = _parse_brief(run.text, req.week_start)
+
+    if brief is None:
+        logger.info("research.repairing")
+        repair = await _run_agent(
+            build_researcher(),
+            f"{_RESEARCH_MESSAGE}\n\n## CORRECTION\nYour previous reply was not valid "
+            "JSON in the required shape. Return ONLY the JSON object described in your "
+            'instructions — keys "themes" -> a list of {title, summary, why_relevant, '
+            'source_url} — with no prose and no markdown fences.',
+            f"wk-{req.week_start}-r2",
+        )
+        in_tokens += repair.input_tokens
+        out_tokens += repair.output_tokens
+        brief = _parse_brief(repair.text, req.week_start)
+        if brief is not None:
+            run = repair
+        else:
+            logger.warning("research.brief_unvalidated", raw=run.text[:200])
+
+    return _ResearchResult(
+        model=MODEL_FLASH,
+        cost_eur=pricing.text_cost(MODEL_FLASH, in_tokens, out_tokens),
+        brief=brief,
+        raw=run.text,
+    )
+
+
 # ---- metered reasoning embedding -------------------------------------------
 
 
@@ -100,19 +177,37 @@ def _strip(text: str) -> str:
     return t
 
 
-async def _run_agent(agent: LlmAgent, message: str, session_id: str) -> str:
+class _AgentRun(NamedTuple):
+    """An agent's final text plus the tokens it actually used (for metering)."""
+
+    text: str
+    input_tokens: int
+    output_tokens: int
+
+
+async def _run_agent(agent: LlmAgent, message: str, session_id: str) -> _AgentRun:
+    """Run `agent` to its final response, summing token usage across its events.
+
+    An agent may take several model turns (a tool call, then the answer), so the
+    counts are accumulated rather than read from the final event alone.
+    """
     runner = InMemoryRunner(agent=agent, app_name=_APP)
     await runner.session_service.create_session(
         app_name=_APP, user_id=_USER, session_id=session_id
     )
     content = types.Content(role="user", parts=[types.Part(text=message)])
     final = ""
+    in_tokens = out_tokens = 0
     async for ev in runner.run_async(
         user_id=_USER, session_id=session_id, new_message=content
     ):
+        usage = ev.usage_metadata
+        if usage is not None:
+            in_tokens += usage.prompt_token_count or 0
+            out_tokens += usage.candidates_token_count or 0
         if ev.is_final_response() and ev.content and ev.content.parts:
             final = ev.content.parts[0].text or ""
-    return final
+    return _AgentRun(final, in_tokens, out_tokens)
 
 
 # Coarse visual "setting" families — used to stop the same scene (e.g. ocean
@@ -269,7 +364,7 @@ async def _enforce_value_rules(
     )
     try:
         retried = GeneratorOutput.model_validate_json(
-            _strip(await _run_agent(build_generator(), correction, f"wk-{week_start}-v2"))
+            _strip((await _run_agent(build_generator(), correction, f"wk-{week_start}-v2")).text)
         )
     except Exception:  # noqa: BLE001 — rule retry is best-effort, never fatal
         logger.warning("pipeline.value_rule_retry_failed", problems=problems)
@@ -293,12 +388,16 @@ def _reasoning_blob(
     rule_ids: list[UUID],
     asset_model: str,
     base_asset_url: str,
+    theme_sources: dict[str, str] | None = None,
 ) -> dict:
     r = spec.references_used
     return {
         "schema_version": SCHEMA_VERSION,
         "pillar": spec.pillar,
         "theme": r.theme,
+        # Which researched article backed this post (None if the brief was invalid
+        # or the generator named a theme the researcher didn't return).
+        "theme_source_url": (theme_sources or {}).get(r.theme or ""),
         "value": r.value,
         "hook": spec.hook,
         "beat": spec.beat,
@@ -390,7 +489,7 @@ async def _enforce_scene_variety(
     )
     try:
         retried = GeneratorOutput.model_validate_json(
-            _strip(await _run_agent(build_generator(), correction, f"wk-{week_start}-g2"))
+            _strip((await _run_agent(build_generator(), correction, f"wk-{week_start}-g2")).text)
         )
     except Exception:  # noqa: BLE001 — variety retry is best-effort, never fatal
         logger.warning("pipeline.scene_repeat_retry_failed", family=family)
@@ -421,19 +520,17 @@ async def run_weekly(week_start: date, *, uploader: AssetUploader) -> WeekResult
 
     logger.info("pipeline.start", week_start=str(week_start), week_id=str(week.id))
 
-    # 1. research -> themes
-    themes = _strip(
-        await _run_agent(
-            build_researcher(),
-            "Produce this week's Blue Fit content themes.",
-            f"wk-{week_start}-r",
-        )
+    # 1. research -> themes (validated into a TrendBrief, metered)
+    research = await _research(_ResearchRequest(trigger="cron", week_start=week_start))
+    themes = _strip(research.raw)
+    theme_sources = (
+        {t.title: t.source_url for t in research.brief.themes} if research.brief else {}
     )
-    try:
-        parsed = json.loads(themes)
-        brief = parsed if isinstance(parsed, dict) else {"themes": parsed}
-    except json.JSONDecodeError:
-        brief = {"themes_raw": themes}
+    brief = (
+        research.brief.model_dump(mode="json")
+        if research.brief
+        else {"themes_raw": themes}
+    )
     async with pool.acquire() as conn:
         await set_week_brief(conn, week.id, brief)
 
@@ -448,14 +545,14 @@ async def run_weekly(week_start: date, *, uploader: AssetUploader) -> WeekResult
         forbidden = await _last_week_values(conn, week_start)
     rule_ids = [r.id for r in rules]
     logger.info("pipeline.forbidden_values", values=sorted(forbidden))
-    total = brand.cost_eur + recent.cost_eur
+    total = research.cost_eur + brand.cost_eur + recent.cost_eur
 
     # 3. generate 3 specs grounded in the retrieved context
     message = _generator_message(
         themes, brand.chunks, [r.text for r in rules], recent.versions, forbidden
     )
     out = GeneratorOutput.model_validate_json(
-        _strip(await _run_agent(build_generator(), message, f"wk-{week_start}-g"))
+        _strip((await _run_agent(build_generator(), message, f"wk-{week_start}-g")).text)
     )
     out = await _enforce_value_rules(out, forbidden, message, week_start)
     out = await _enforce_scene_variety(
@@ -489,7 +586,9 @@ async def run_weekly(week_start: date, *, uploader: AssetUploader) -> WeekResult
                     content_type=asset.content_type,
                 )
             )
-            blob = _reasoning_blob(spec, brand.chunk_ids, rule_ids, asset.model, base_url)
+            blob = _reasoning_blob(
+                spec, brand.chunk_ids, rule_ids, asset.model, base_url, theme_sources
+            )
             reason = await _embed_reasoning(
                 _ReasonEmbedRequest(
                     text=_reason_text(spec), trigger="cron", post_id=post.id
