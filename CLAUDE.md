@@ -3,7 +3,7 @@
 ## What this is
 
 Per-client Instagram content generation agent. One Python service per client
-deployment. Every Friday 09:00 UTC, generates 2 images + 1 short video with
+deployment. Every Monday 04:00 UTC (06:00 Amsterdam), generates 2 images + 1 video with
 captions, surfaces them in a chat UI for review, downloads finals for manual
 posting. Single-tenant per deployment.
 

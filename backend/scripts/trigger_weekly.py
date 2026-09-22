@@ -1,6 +1,8 @@
-"""Friday weekly content generation — the Render Cron entrypoint.
+"""Monday weekly content generation — the Render Cron entrypoint.
 
-Schedule: Fridays 09:00 UTC. Builds the DB pool, runs the full weekly pipeline
+Schedule: Mondays 04:00 UTC (cron `0 4 * * 1`) = 06:00 Amsterdam, 05:00 in winter --
+Render crons run in UTC, so the local hour shifts with DST. Builds the DB pool,
+runs the pipeline
 (research -> RAG -> generate -> render -> upload to R2 -> persist), then exits
 non-zero if the week did not finish 'ready' so the cron run is flagged failed.
 

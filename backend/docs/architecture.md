@@ -43,7 +43,7 @@ There is no separate worker process. The scheduler and the HTTP server share the
 
 ### 2.1 Content tables
 
-**`weeks`** — one row per Friday generation run
+**`weeks`** — one row per weekly generation run
 ```
 id           UUID        PK, gen_random_uuid()
 week_start   DATE        UNIQUE — prevents double-generation
@@ -250,7 +250,7 @@ The editor agent handles all user interactions: edit requests, explain requests,
 ### 4.4 Pipeline flow (weekly)
 
 ```
-APScheduler fires Friday 09:00 UTC
+Render Cron fires Monday 04:00 UTC
         │
         ▼
 pipeline.py: pre-flight
@@ -349,7 +349,7 @@ Written at generation time. Never computed after the fact.
 
 All jobs use the APScheduler `AsyncIOScheduler` with a Postgres jobstore for misfire recovery.
 
-### 7.1 Weekly pipeline — Fridays 09:00 UTC
+### 7.1 Weekly pipeline — Mondays 04:00 UTC (06:00 Amsterdam)
 
 See §4.4. Misfire grace: 1 hour. On misfire: run once on next startup within the grace window, then skip.
 

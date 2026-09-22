@@ -10,7 +10,7 @@
 
 A per-client Instagram content generation agent. One Python service per client deployment. The agent:
 
-- Generates 3 brand-aligned posts per week (2 images, 1 short video) every Friday at 09:00 UTC
+- Generates 3 brand-aligned posts per week (2 images, 1 short video) every Monday at 04:00 UTC (06:00 Amsterdam)
 - Surfaces those posts in a conversational chat UI for human review
 - Accepts edit requests in natural language and produces new versions
 - Learns durable preferences from edits and applies them to future generations
@@ -58,7 +58,7 @@ Internal Prompt Support: Major structural changes that would apply to each subse
 
 ### 4.1 Weekly generation pipeline
 
-Every Friday at 09:00 UTC, the system must:
+Every Monday at 04:00 UTC (06:00 Amsterdam), the system must:
 
 1. Run the researcher agent (Gemini Flash with `google_search` tool) to produce a structured `TrendBrief`. The brief is grounded in the latest strategic brief if one exists.
 2. Run the generator agent (Gemini Pro) using the weekly brief, the strategic brief, brand RAG context, and active rules. Generator produces 3 post specifications with prompts and captions.
@@ -298,7 +298,7 @@ Per-client operating cost should stay within €25–35/month at typical edit vo
 - Deploy script for new VPS provisioning
 - One end-to-end test of the weekly flow
 
-**Exit criteria:** Friday cron generates three posts on schedule for client #1, viewable in chat, downloadable from R2.
+**Exit criteria:** the Monday cron generates three posts on schedule for client #1, viewable in chat, downloadable from R2.
 
 ### Phase 2 — Production hardening (target: weeks 5–8)
 

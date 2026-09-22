@@ -30,7 +30,7 @@ date, file changed, and reason.
   validates it and re-prompts once on a malformed reply; if it is still
   invalid the raw text is passed through with a loud
   `research.brief_unvalidated` warning rather than failing the week (no
-  posts on Friday would be worse than a loose brief). The whole step is
+  posts that week would be worse than a loose brief). The whole step is
   `@meter("research")`, priced from the agent's real token counts.
 - The generator MUST declare `references_used` for each post — these
   become the `reasoning_blob`. Empty references means brand alignment
