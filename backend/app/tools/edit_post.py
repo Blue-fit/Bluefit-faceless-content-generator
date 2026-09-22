@@ -90,6 +90,60 @@ class EditPlan(BaseModel):
         return "tweak" if info.field_name == "mode" else []
 
 
+def summarise_edit(
+    *,
+    post_type: str,
+    media_rerendered: bool,
+    hook_before: str | None,
+    hook_after: str | None,
+    caption_changed: bool,
+    caption_followed_asset: bool,
+    version_number: int,
+) -> str:
+    """Say what actually changed, and what did not.
+
+    The old reply ("tweak applied to the asset") left the client guessing whether
+    both halves of their request landed and whether the picture had been replaced.
+    Built from facts rather than a model call: free, instant and always true.
+    """
+    media = "video" if post_type == "video" else "photo"
+    did: list[str] = []
+    kept: list[str] = []
+
+    hook_changed = bool(hook_after) and hook_after != hook_before
+    if media_rerendered:
+        did.append(f"made a new {media}")
+    if hook_changed:
+        first_line = (hook_after or "").splitlines()[0].strip() if hook_after else ""
+        did.append(f'set the on-screen text to "{first_line}"')
+    elif not media_rerendered:
+        kept.append(f"the {media} and its on-screen text are unchanged")
+    if media_rerendered and not hook_changed:
+        kept.append("the on-screen text is unchanged")
+    if not media_rerendered and hook_changed:
+        kept.append(f"the {media} itself is untouched")
+
+    if caption_changed:
+        did.append(
+            "rewrote the caption to match" if caption_followed_asset
+            else "rewrote the caption"
+        )
+    else:
+        kept.append("the caption is unchanged")
+
+    if not did:  # nothing to report would be the vaguest answer of all
+        return (
+            f"I could not change anything on this post (still version {version_number}). "
+            "Tell me specifically what to change — the caption, the text in the image, "
+            f"or the {media} itself."
+        )
+    done = did[0] if len(did) == 1 else ", ".join(did[:-1]) + f" and {did[-1]}"
+    reply = f"Done — I {done}."
+    if kept:
+        reply += " " + (kept[0] if len(kept) == 1 else "; ".join(kept)).capitalize() + "."
+    return reply + f" This is version {version_number}."
+
+
 class EditRequest(BaseModel):
     post_id: UUID
     instruction: str
@@ -98,6 +152,7 @@ class EditRequest(BaseModel):
 
 class EditResult(BaseModel):
     version_id: UUID
+    summary: str  # what changed, in plain words, for the chat thread
     version_number: int
     target: str
     mode: str
@@ -376,6 +431,8 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
 
     new_caption = current.caption
     new_asset_url = current.asset_url
+    media_rerendered = False
+    caption_followed_asset = False  # caption changed to track the asset, not by request
     wants_asset = "asset" in plan.targets
     wants_caption = "caption" in plan.targets
     # Ask rather than guess: a vague request costs only the classify call above.
@@ -411,10 +468,12 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
             and plan.mode != "regenerate"
             and (plan.text_scale is not None or bool(plan.new_hook))
         )
+        media_rerendered = not (text_only and base_url)
         if post.type == "image":
             # Images carry their typography in-picture (decisions/010): a text edit
             # re-renders ONLY the text on the stored final (Pro Image edit mode);
             # anything else is a fresh render with the new hook drawn in.
+            media_rerendered = not (text_only and base_url and hook)
             if text_only and base_url and hook:
                 edited = await edit_still_text(
                     await _fetch_bytes(base_url),
@@ -492,6 +551,7 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
             )
             new_caption = sync.caption
             cost += sync.cost_eur
+            caption_followed_asset = True
 
         blob = {
             **blob,
@@ -549,8 +609,18 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         "edit.done", post_id=str(req.post_id), targets=plan.targets,
         mode=plan.mode, version=version.version_number,
     )
+    summary = summarise_edit(
+        post_type=post.type,
+        media_rerendered=wants_asset and media_rerendered,
+        hook_before=(current.reasoning_blob or {}).get("hook"),
+        hook_after=blob.get("hook"),
+        caption_changed=(new_caption or "") != (current.caption or ""),
+        caption_followed_asset=caption_followed_asset,
+        version_number=version.version_number,
+    )
     return EditResult(
         version_id=version.id,
+        summary=summary,
         version_number=version.version_number,
         target=" and ".join(plan.targets),
         mode=plan.mode,

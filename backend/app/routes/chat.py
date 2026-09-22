@@ -70,10 +70,7 @@ async def chat(
             EditRequest(post_id=post_id, instruction=body.message),
             uploader=R2Uploader(),
         )
-        reply = (
-            f"Done — {result.mode} applied to the {result.target}. "
-            f"This is version {result.version_number}."
-        )
+        reply = result.summary
         version = {
             "id": str(result.version_id),
             "version_number": result.version_number,
