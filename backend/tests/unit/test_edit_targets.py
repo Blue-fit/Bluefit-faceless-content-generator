@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.tools.edit_post import _CLASSIFY, EditPlan
+from app.tools.edit_post import _CLASSIFY, EditNeedsClarification, EditPlan
 
 
 def test_plan_accepts_both_targets() -> None:
@@ -34,3 +34,35 @@ def test_classifier_returns_targets_not_target() -> None:
     """The output contract must name the list, or the plan won't validate."""
     assert '{"targets","mode"' in _CLASSIFY
     assert '{"target","mode"' not in _CLASSIFY
+
+
+# ---- asking instead of guessing -------------------------------------------------
+
+
+def test_plan_tolerates_an_explicit_null_mode() -> None:
+    """A clarification reply carries mode=null; it must still parse.
+
+    Without this the whole plan fails validation and the client sees
+    "that edit failed" instead of the question.
+    """
+    plan = EditPlan.model_validate_json('{"targets": [], "mode": null, "clarify": "Wat precies?"}')
+    assert plan.mode == "tweak" and plan.targets == [] and plan.clarify == "Wat precies?"
+
+
+def test_plan_tolerates_an_explicit_null_targets() -> None:
+    assert EditPlan.model_validate_json('{"targets": null, "mode": "tweak"}').targets == []
+
+
+def test_classifier_is_told_to_ask_rather_than_guess() -> None:
+    assert '"clarify"' in _CLASSIFY
+    assert "too vague to act on" in _CLASSIFY
+    # the real messages that were silently acted on
+    assert "dit kan echt beter" in _CLASSIFY
+    assert "wat is er verkeerd gegaan?" in _CLASSIFY
+    assert "A request that names something concrete is NOT vague" in _CLASSIFY
+
+
+def test_clarification_carries_its_question() -> None:
+    exc = EditNeedsClarification("Wat zal ik aanpassen?")
+    assert exc.question == "Wat zal ik aanpassen?"
+    assert str(exc) == "Wat zal ik aanpassen?"

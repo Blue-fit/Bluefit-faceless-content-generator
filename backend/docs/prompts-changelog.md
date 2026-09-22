@@ -1,6 +1,14 @@
 # Prompts changelog
 
 ## 2026-09-22 (b) - edit fixes from a production audit
+- `tools/edit_post.py` `_CLASSIFY` - **new `clarify`: ask rather than guess.** A vague
+  request ("dit kan echt beter", "niet goed") or a QUESTION ("wat is er verkeerd
+  gegaan?") now returns a short question in the client's language naming the concrete
+  options, instead of a guessed edit. No version is created and nothing is rendered -
+  only the classify call is spent. Reason: production showed "wat is er verkeerd
+  gegaan?" silently rewriting the caption and "dit kan echt beter" regenerating the
+  picture. A request naming something concrete is explicitly NOT vague, so the system
+  does not start nagging on clear instructions.
 - `tools/edit_post.py` `_CLASSIFY` - **`target` became `targets`, a list.** An audit of
   all 39 real client edits showed the top complaint's cause: the client asks for the
   media AND the caption in one sentence and only half was ever applied. Examples from

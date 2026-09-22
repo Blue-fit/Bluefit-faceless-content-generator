@@ -13,7 +13,12 @@ from app.db.connection import get_pool
 from app.db.repositories.messages import get_messages_for_post, insert_message
 from app.storage.r2 import R2Uploader
 from app.tools import ToolError
-from app.tools.edit_post import EditError, EditRequest, edit_post
+from app.tools.edit_post import (
+    EditError,
+    EditNeedsClarification,
+    EditRequest,
+    edit_post,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -63,6 +68,9 @@ async def chat(
             "caption": result.caption,
             "cost_eur": float(result.cost_eur),
         }
+    except EditNeedsClarification as exc:
+        # Not a failure: the post is untouched and we ask what they meant.
+        reply = exc.question
     except EditError as exc:
         reply = f"I couldn't apply that edit: {exc}"
     except ToolError as exc:

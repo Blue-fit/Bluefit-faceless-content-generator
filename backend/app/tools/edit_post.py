@@ -16,7 +16,7 @@ from uuid import UUID
 import asyncpg
 import httpx
 import structlog
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationInfo, field_validator
 
 from app.agents.render import edit_still_text, render_base
 from app.db.connection import get_pool
@@ -45,17 +45,49 @@ class EditError(RuntimeError):
     """Raised on an invalid edit (missing post, version limit reached, bad plan)."""
 
 
+class EditNeedsClarification(RuntimeError):
+    """The instruction was too vague (or not an edit) — ask before changing anything.
+
+    Guessing at a vague request is how a post gets worse: "dit kan echt beter"
+    regenerated the picture, and the question "wat is er verkeerd gegaan?" silently
+    rewrote the caption. No version is created and nothing is rendered; the client
+    just gets the question back.
+    """
+
+    def __init__(self, question: str) -> None:
+        super().__init__(question)
+        self.question = question
+
+
 class EditPlan(BaseModel):
     # One OR BOTH. A single target was the biggest source of "it didn't edit
     # properly": the client routinely asks for the media AND the caption in one
     # sentence ("...ook in de caption") and only half of it was ever applied.
     targets: list[Literal["asset", "caption"]]
-    mode: Literal["tweak", "regenerate", "rewrite"]
+    # Defaulted: a clarification reply carries no mode, and a plan that fails to
+    # validate surfaces to the client as "that edit failed".
+    mode: Literal["tweak", "regenerate", "rewrite"] = "tweak"
     new_scene_prompt: str | None = None
     new_hook: str | None = None
     caption_template: Template | None = None
     caption_instruction: str | None = None
     text_scale: float | None = None
+    # Set INSTEAD of a plan when the request is too vague or is a question.
+    clarify: str | None = None
+
+    @field_validator("mode", "targets", mode="before")
+    @classmethod
+    def _tolerate_nulls(cls, value: object, info: ValidationInfo) -> object:
+        """Accept an explicit null for these two fields.
+
+        A clarification reply legitimately carries `"mode": null`, and the model
+        sometimes nulls `targets` too. Pydantic validates a PROVIDED null against
+        the Literal, so without this the whole plan fails to parse and the client
+        sees "that edit failed" instead of the question.
+        """
+        if value is not None:
+            return value
+        return "tweak" if info.field_name == "mode" else []
 
 
 class EditRequest(BaseModel):
@@ -89,6 +121,14 @@ Decide:
   beter en ook de caption", "maak een nieuwe post en een nieuwe caption",
   "verwijs meer naar de blue zones, ook in de caption" -> ["asset","caption"].
   Never silently drop half of what was asked. When in doubt, include "asset".
+- "clarify": use this INSTEAD of guessing. If the request is too vague to act on
+  ("dit kan echt beter", "maak het mooier", "niet goed"), or is a QUESTION rather
+  than an instruction ("wat is er verkeerd gegaan?", "waarom is dit zo?"), return
+  "targets": [] and set "clarify" to a SHORT question in the SAME LANGUAGE as the
+  request, naming the concrete options so they can just pick one — the caption, the
+  text on the image/video, the image/video itself, or the colours/style. Example:
+  "Wat zal ik precies aanpassen: de caption, de tekst in beeld, of de foto zelf?".
+  A request that names something concrete is NOT vague — act on it normally.
 - "mode": "tweak" (small change to the same concept), "regenerate" (same concept,
   a fresh take), or "rewrite" (a meaningfully different concept).
 - For an asset tweak/rewrite that should change the video/image itself, set
@@ -125,7 +165,7 @@ Decide:
   pre-mascot weeks) show people or scenery instead.
 
 Return exactly the keys:
-{"targets","mode","new_scene_prompt","new_hook","caption_template","caption_instruction","text_scale"}"""
+{"targets","mode","new_scene_prompt","new_hook","caption_template","caption_instruction","text_scale","clarify"}"""
 
 
 # ---- "make this like week N" reference resolution ---------------------------
@@ -333,8 +373,13 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
     new_asset_url = current.asset_url
     wants_asset = "asset" in plan.targets
     wants_caption = "caption" in plan.targets
-    if not plan.targets:  # a classifier slip must not silently no-op
-        raise EditError("the edit classifier returned no target to change.")
+    # Ask rather than guess: a vague request costs only the classify call above.
+    if plan.clarify or not plan.targets:
+        raise EditNeedsClarification(
+            plan.clarify
+            or "Wat zal ik precies aanpassen: de caption, de tekst in beeld, "
+            "of de foto/video zelf?"
+        )
 
     # Asset first, so a caption written afterwards reflects the NEW scene/hook.
     if wants_asset:
