@@ -381,7 +381,7 @@ def _generator_message(
             "## Real search queries to target (what our audience is searching)\n"
             "These are the audience's own words for their problems — unfiltered by our "
             "brand. Build each post as the SOLUTION to one of them, told through its "
-            "pillar and Power-9 value and acted out by Bluei. Take the hook/caption "
+            "pillar and Power-9 value and acted out by Bluey. Take the hook/caption "
             "keyword FROM this list — do not invent one. Skip anything medical, about "
             "another gym, or off-brand.\n"
             f"{demand}\n\n"

@@ -10,7 +10,7 @@
   competitor and price queries filtered out. Fail-soft: no data = the old behaviour.
 - `agents/prompts/researcher.md` — now works problem → pillar/value → **solution**:
   pick a real searched problem, match the value that speaks to it, build the theme
-  around the solution Bluei can act out, and record the query in `search_query`
+  around the solution Bluey can act out, and record the query in `search_query`
   (new optional `TrendTheme.search_query`; additive, no SCHEMA_VERSION bump).
   `google_search` becomes evidence-finding rather than topic-finding.
 - `agents/prompts/generator.md` — the hook/caption keyword must be taken FROM the
@@ -96,13 +96,13 @@
   OFL) — Montserrat has no emoji glyphs — with a plain arrow fallback if the font is
   missing. Reason: client wants an explicit, emoji-marked nudge to read the caption.
 - `agents/prompts/generator.md`, `caption_question.md`, `caption_hottake.md`,
-  `caption_observation.md` — **the mascot is named Bluei.** Video captions are written in
-  Bluei's own voice (first person, talking to the viewer); image captions refer to Bluei
+  `caption_observation.md` — **the mascot is named Bluey.** Video captions are written in
+  Bluey's own voice (first person, talking to the viewer); image captions refer to Bluey
   by name in the third person. On screen it still never speaks. Replaces the earlier
   "no name / never the narrator / *de Blue Fit beer*" rule. The edit-time caption tool now
-  receives the post `type` so a video re-sync also comes out in Bluei's voice. Reason:
+  receives the post `type` so a video re-sync also comes out in Bluey's voice. Reason:
   client direction.
-- `agents/prompts/generator.md` + `caption_*.md` — **video captions: Bluei gives one
+- `agents/prompts/generator.md` + `caption_*.md` — **video captions: Bluey gives one
   concrete piece of advice the viewer can act on today** (a specific, doable action, not
   a vague tip), on top of speaking in first person. Images unchanged (third person by
   name). Reason: client direction.

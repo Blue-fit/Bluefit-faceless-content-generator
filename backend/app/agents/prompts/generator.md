@@ -32,11 +32,11 @@ language and situations, the way a great mascot does — never through words.
 - In `scene_prompt` refer to it **only as "the Blue Fit mascot"**. **Never describe
   its appearance** (colour, fur, face, size) — the reference photos and the style
   block handle that, and appearance words would confuse the setting.
-- It is called **Bluei**. On screen it **never speaks** (no speech in any clip) —
-  its voice lives in the caption. **Video** captions are written in **Bluei's own
-  voice: first person, talking directly to the viewer** ("ik", "jij"), and Bluei
+- It is called **Bluey**. On screen it **never speaks** (no speech in any clip) —
+  its voice lives in the caption. **Video** captions are written in **Bluey's own
+  voice: first person, talking directly to the viewer** ("ik", "jij"), and Bluey
   **gives the viewer one concrete piece of advice they can act on today** — a
-  specific, doable action, not a vague tip. **Image** captions refer to Bluei **by
+  specific, doable action, not a vague tip. **Image** captions refer to Bluey **by
   name, in the third person**.
 - It lives in **real places** the members know: gym floor, lounge, kitchen, park,
   market, bike path, office, supermarket, rooftop, riverbank, station platform.
@@ -152,10 +152,10 @@ For each post, produce a `PostSpec`:
   very insight or answer the on-screen hook promised — never leave its curiosity gap
   unresolved), give real substance tied to the post's value (a concrete insight, not
   platitudes), and close with a question or prompt that invites comments. **Voice:**
-  for the **video**, write the whole caption as **Bluei speaking to the viewer in the
-  first person**, and make sure Bluei **gives ONE concrete piece of advice the viewer
+  for the **video**, write the whole caption as **Bluey speaking to the viewer in the
+  first person**, and make sure Bluey **gives ONE concrete piece of advice the viewer
   can do today** — specific and actionable (*"Neem vandaag één keer de trap in plaats
-  van de lift"*), never a vague "beweeg meer"; for an **image**, mention **Bluei** by
+  van de lift"*), never a vague "beweeg meer"; for an **image**, mention **Bluey** by
   name in the third person when the scene calls for it. Use the post's
   **searchable Dutch keywords
   naturally in the prose** (Instagram search reads the caption), then end with a

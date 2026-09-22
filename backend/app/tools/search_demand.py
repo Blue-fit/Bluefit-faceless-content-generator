@@ -4,7 +4,7 @@ Mines Google's autocomplete endpoint (`suggestqueries`, no key, no cost) for the
 PROBLEMS the audience is searching about, in their own words. This step is
 deliberately brand-blind: it asks only what viewers struggle with, not how Blue Fit
 would answer. The researcher and generator then combine a real problem with a pillar
-and a Power-9 value to produce the solution Bluei acts out.
+and a Power-9 value to produce the solution Bluey acts out.
 
 Scope is **national NL** (`hl=nl, gl=nl`), not the club's city: local seeds return
 almost nothing (`fitness lent nijmegen` -> 1 suggestion) and would cap reach.
@@ -33,7 +33,7 @@ _MAX_LEN = 80  # drop rambling suggestions
 # The viewer's PROBLEMS, in their own words — deliberately NOT derived from the four
 # pillars or the Power-9 values. This step only asks "what is our audience struggling
 # with and searching for"; the brand lens is applied afterwards, when the researcher
-# and generator turn a problem + a value into the solution Bluei acts out.
+# and generator turn a problem + a value into the solution Bluey acts out.
 #
 # Everyday Dutch only, never brand jargon: "gezond eten blue zones" returns 0
 # suggestions and "natuurlijk bewegen" returns physiotherapy practices.
