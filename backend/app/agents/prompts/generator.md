@@ -146,7 +146,7 @@ For each post, produce a `PostSpec`:
   gap. Punchy, confident, on-brand — never hype or "no excuses". Never null.
 - `caption_template` — `"question"`, `"hottake"`, or `"observation"`; pick what
   best sparks comments for that post.
-- `caption` — an **in-depth** Instagram caption (3–5 sentences) in Blue Fit's voice.
+- `caption` — an **in-depth** Instagram caption (3–5 sentences) in Blue Fit's voice, **written in Dutch** (the brand's language - never English or any other language).
   **This is where the real value lives** — the hook only earned the click; the caption
   must reward it. Matching the template: open by **paying off the hook** (deliver the
   very insight or answer the on-screen hook promised — never leave its curiosity gap

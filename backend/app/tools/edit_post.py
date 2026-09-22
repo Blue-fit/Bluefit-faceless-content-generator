@@ -1,7 +1,7 @@
 """Edit a post: classify a free-text instruction, dispatch the right tool, version it.
 
 The only place that knows the three edit modes (tweak / regenerate / rewrite) and
-whether an edit targets the asset or the caption (tools/CLAUDE.md). Edits never
+which of the asset / caption an edit touches -- one or both (tools/CLAUDE.md). Edits never
 mutate — each produces a new `post_versions` row pointing at its parent. It
 dispatches paid tools (each @meter-wrapped); `edit_post` itself is the orchestrator.
 """
@@ -46,7 +46,10 @@ class EditError(RuntimeError):
 
 
 class EditPlan(BaseModel):
-    target: Literal["asset", "caption"]
+    # One OR BOTH. A single target was the biggest source of "it didn't edit
+    # properly": the client routinely asks for the media AND the caption in one
+    # sentence ("...ook in de caption") and only half of it was ever applied.
+    targets: list[Literal["asset", "caption"]]
     mode: Literal["tweak", "regenerate", "rewrite"]
     new_scene_prompt: str | None = None
     new_hook: str | None = None
@@ -75,12 +78,17 @@ _CLASSIFY = """You classify a free-text edit request for a Blue Fit social post 
 return STRICT JSON only — no prose, no code fences.
 
 Decide:
-- "target": "asset" if the change is about the image/video itself OR the ON-SCREEN
+- "targets": a LIST naming everything the request touches. Include "asset" if the
+  change is about the image/video itself OR the ON-SCREEN
   text overlaid on it — the "hook" burned into the media (e.g. "the text in the
   video", "de tekst in de video", "de tekst op de foto", "the words on screen",
   "change the on-screen text"). Use "caption" ONLY for the written caption /
   description shown BENEATH the post. Rule of thumb: text that is IN / ON the
-  video or image is the ASSET hook, not the caption — when in doubt, choose "asset".
+  video or image is the ASSET hook, not the caption.
+  **If the request mentions BOTH, return BOTH** — e.g. "de tekst in de video moet
+  beter en ook de caption", "maak een nieuwe post en een nieuwe caption",
+  "verwijs meer naar de blue zones, ook in de caption" -> ["asset","caption"].
+  Never silently drop half of what was asked. When in doubt, include "asset".
 - "mode": "tweak" (small change to the same concept), "regenerate" (same concept,
   a fresh take), or "rewrite" (a meaningfully different concept).
 - For an asset tweak/rewrite that should change the video/image itself, set
@@ -105,7 +113,8 @@ Decide:
   RELATIVE to the current text: 0.8 = a bit smaller, 0.65 = much smaller, 1.25 =
   bigger. Use target "asset", mode "tweak", and leave "new_scene_prompt" null so
   the scene is kept. Otherwise "text_scale" is null.
-- For a caption edit, set "caption_instruction" to a concise directive; set
+- When "caption" is among the targets, set "caption_instruction" to a concise
+  directive capturing the caption part of the request; set
   "caption_template" only if the engagement style should change
   (question|hottake|observation), else null.
 - If a "## Reference posts" section is present, the user is asking to emulate that
@@ -116,7 +125,7 @@ Decide:
   pre-mascot weeks) show people or scenery instead.
 
 Return exactly the keys:
-{"target","mode","new_scene_prompt","new_hook","caption_template","caption_instruction","text_scale"}"""
+{"targets","mode","new_scene_prompt","new_hook","caption_template","caption_instruction","text_scale"}"""
 
 
 # ---- "make this like week N" reference resolution ---------------------------
@@ -322,28 +331,13 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
 
     new_caption = current.caption
     new_asset_url = current.asset_url
+    wants_asset = "asset" in plan.targets
+    wants_caption = "caption" in plan.targets
+    if not plan.targets:  # a classifier slip must not silently no-op
+        raise EditError("the edit classifier returned no target to change.")
 
-    if plan.target == "caption":
-        raw_template = plan.caption_template or blob.get("engagement_template") or "observation"
-        template = cast(
-            Template, raw_template if raw_template in get_args(Template) else "observation"
-        )
-        brief = (
-            f"type: {post.type} | pillar: {post.pillar} | theme: {blob.get('theme')} | "
-            f"value: {blob.get('value')} | scene: {blob.get('scene_prompt')}"
-        )
-        caption = await generate_caption(
-            CaptionRequest(
-                template=template,
-                brief=brief,
-                instruction=plan.caption_instruction or req.instruction,
-                trigger="edit",
-                post_id=req.post_id,
-            )
-        )
-        new_caption = caption.caption
-        cost += caption.cost_eur
-    else:
+    # Asset first, so a caption written afterwards reflects the NEW scene/hook.
+    if wants_asset:
         scene = plan.new_scene_prompt or blob.get("scene_prompt")
         if not scene:
             raise EditError("no scene_prompt available to edit this asset.")
@@ -422,7 +416,9 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         # BEFORE the blob is overwritten, so "changed" compares against the original.
         hook_changed = bool(plan.new_hook) and hook != blob.get("hook")
         scene_changed = bool(plan.new_scene_prompt) and scene != blob.get("scene_prompt")
-        if hook_changed or scene_changed:
+        # Skipped when the client also asked for a caption change: their own
+        # instruction is applied below instead of this generic re-sync.
+        if (hook_changed or scene_changed) and not wants_caption:
             raw_t = blob.get("engagement_template") or "observation"
             sync_template = cast(
                 Template, raw_t if raw_t in get_args(Template) else "observation"
@@ -455,12 +451,34 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
             "base_asset_url": base_url,
         }
 
+
+    if wants_caption:
+        raw_template = plan.caption_template or blob.get("engagement_template") or "observation"
+        template = cast(
+            Template, raw_template if raw_template in get_args(Template) else "observation"
+        )
+        brief = (
+            f"type: {post.type} | pillar: {post.pillar} | theme: {blob.get('theme')} | "
+            f"value: {blob.get('value')} | scene: {blob.get('scene_prompt')} | "
+            f"on-screen hook: {blob.get('hook')}"
+        )
+        caption = await generate_caption(
+            CaptionRequest(
+                template=template,
+                brief=brief,
+                instruction=plan.caption_instruction or req.instruction,
+                trigger="edit",
+                post_id=req.post_id,
+            )
+        )
+        new_caption = caption.caption
+        cost += caption.cost_eur
     new_blob = {
         **blob,
         "caption": new_caption,
         "edit_instruction": req.instruction,
         "edit_mode": plan.mode,
-        "edit_target": plan.target,
+        "edit_target": list(plan.targets),
         "parent_version": str(current.id),
     }
     async with pool.acquire() as conn, conn.transaction():
@@ -478,13 +496,13 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         await set_current_version(conn, req.post_id, version.id)
 
     logger.info(
-        "edit.done", post_id=str(req.post_id), target=plan.target,
+        "edit.done", post_id=str(req.post_id), targets=plan.targets,
         mode=plan.mode, version=version.version_number,
     )
     return EditResult(
         version_id=version.id,
         version_number=version.version_number,
-        target=plan.target,
+        target=" and ".join(plan.targets),
         mode=plan.mode,
         asset_url=new_asset_url,
         caption=new_caption,

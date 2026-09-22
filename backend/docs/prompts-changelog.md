@@ -1,5 +1,19 @@
 # Prompts changelog
 
+## 2026-09-22 (b) - edit fixes from a production audit
+- `tools/edit_post.py` `_CLASSIFY` - **`target` became `targets`, a list.** An audit of
+  all 39 real client edits showed the top complaint's cause: the client asks for the
+  media AND the caption in one sentence and only half was ever applied. Examples from
+  production: "verwijs hierin meer naar de blue zones, ook in de caption" (caption
+  untouched; asked again 5 minutes later), "geen kettle bell ... en zeg iets in de tekst
+  over mobiliteit" (followed by "wat is er verkeerd gegaan?"), "maak een helemaal nieuwe
+  post hierover en dan met een nieuwe caption", "vooral de tekst in de foto en de tekst
+  in de caption". The classifier is now told to return both and never drop half a
+  request; the asset is applied first so the caption reflects the new scene/hook.
+- `agents/prompts/generator.md` - the caption must be **written in Dutch**. It was only
+  implied ("Dutch keywords"), and a caption shipped in Spanish: "Waarom opeens spaans
+  en niet nederlands".
+
 ## 2026-09-22
 - **New: `tools/search_demand.py`** mines Google autocomplete (national NL, free, no
   key) for the PROBLEMS the audience types, in their own words. Seeds are everyday

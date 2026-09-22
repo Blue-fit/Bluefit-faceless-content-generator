@@ -46,6 +46,12 @@ modes. It receives an instruction, classifies it, and dispatches the
 appropriate underlying tool. The classification logic lives here, not in
 the agent prompt.
 
+`EditPlan.targets` is a LIST: an instruction may touch the asset, the
+caption, or **both**. Clients routinely ask for both in one sentence
+("...en ook de caption"), and applying only half of it was the single
+biggest source of "the edit didn't work". The asset runs first so a
+caption written afterwards reflects the new scene and hook.
+
 ## When adding a tool
 
 1. Create `app/tools/your_tool.py`
