@@ -128,6 +128,11 @@ Decide:
   request, naming the concrete options so they can just pick one — the caption, the
   text on the image/video, the image/video itself, or the colours/style. Example:
   "Wat zal ik precies aanpassen: de caption, de tekst in beeld, of de foto zelf?".
+  Also use "clarify" when the message is NOT a change request at all: praise or an
+  acknowledgement ("Deze is nu erg mooi en heb ik gebruikt!"), a bare command with no
+  object ("doe het", "fix het"), or a complaint about a previous edit ("er verandert
+  niks in de post"). Acknowledge briefly and ask what to change — never edit the post
+  on the strength of a compliment.
   A request that names something concrete is NOT vague — act on it normally.
 - "mode": "tweak" (small change to the same concept), "regenerate" (same concept,
   a fresh take), or "rewrite" (a meaningfully different concept).

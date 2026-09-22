@@ -1,6 +1,11 @@
 # Prompts changelog
 
 ## 2026-09-22 (b) - edit fixes from a production audit
+- `tools/edit_post.py` `_CLASSIFY` - `clarify` also covers messages that are NOT change
+  requests: praise ("Deze is nu erg mooi en heb ik gebruikt!"), bare commands with no
+  object ("doe het", "fix het"), and complaints ("er verandert niks in de post"). All
+  six produced a failure reply in production; the system must never edit a post on the
+  strength of a compliment.
 - `tools/edit_post.py` `_CLASSIFY` - **new `clarify`: ask rather than guess.** A vague
   request ("dit kan echt beter", "niet goed") or a QUESTION ("wat is er verkeerd
   gegaan?") now returns a short question in the client's language naming the concrete
