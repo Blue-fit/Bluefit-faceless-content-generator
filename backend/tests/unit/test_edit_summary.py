@@ -111,3 +111,29 @@ def test_reassurances_never_contradict_each_other() -> None:
         if "set the on-screen text" in reply or "made the on-screen text" in reply:
             assert "on-screen text is unchanged" not in reply
             assert "on-screen text are unchanged" not in reply
+
+
+def test_a_new_photo_says_what_is_in_it() -> None:
+    """'I made a new photo' does not tell them whether it is what they asked for."""
+    reply = _s(media_rerendered=True, media_note="Bluey sharing a table with members")
+    assert "made a new photo showing Bluey sharing a table with members" in reply
+
+
+def test_the_description_of_the_new_scene_is_dutch_for_a_dutch_client() -> None:
+    reply = _s(
+        language="nl",
+        post_type="video",
+        media_rerendered=True,
+        media_note="Bluey tussen de leden in de gym.",  # the model likes a full stop
+    )
+    assert "een nieuwe video gemaakt met Bluey tussen de leden in de gym." in reply
+    assert "gym.." not in reply  # its full stop must not double up with ours
+
+
+def test_without_a_description_the_old_wording_stands() -> None:
+    assert "made a new photo." in _s(media_rerendered=True, media_note=None)
+
+
+def test_a_stray_capital_on_an_article_is_dropped_but_a_name_is_not() -> None:
+    assert "showing a brighter version" in _s(media_rerendered=True, media_note="A brighter version")
+    assert "showing Bluey at the door" in _s(media_rerendered=True, media_note="Bluey at the door")

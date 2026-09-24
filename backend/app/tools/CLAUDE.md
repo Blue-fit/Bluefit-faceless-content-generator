@@ -46,6 +46,11 @@ modes. It receives an instruction, classifies it, and dispatches the
 appropriate underlying tool. The classification logic lives here, not in
 the agent prompt.
 
+`EditPlan.change_note` is the classifier's one-line description, in the client's
+language, of what the new image/video shows. `summarise_edit()` builds the whole
+reply from facts (no model call), and uses that note so the answer is "I made a new
+photo showing X" rather than "I made a new photo".
+
 `EditPlan.targets` is a LIST: an instruction may touch the asset, the
 caption, or **both**. Clients routinely ask for both in one sentence
 ("...en ook de caption"), and applying only half of it was the single

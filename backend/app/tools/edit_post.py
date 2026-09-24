@@ -80,6 +80,9 @@ class EditPlan(BaseModel):
     clarify: str | None = None
     # ISO 639-1 code of the request, so the reply speaks the client's language.
     language: str = "en"
+    # A short phrase, in that language, describing what the NEW image/video shows,
+    # so the reply can say what was made instead of only that something was made.
+    change_note: str | None = None
 
     @field_validator("mode", "targets", mode="before")
     @classmethod
@@ -103,6 +106,7 @@ _PHRASES: dict[str, dict[str, str]] = {
     "en": {
         "photo": "photo", "video": "video",
         "new_media": "made a new {media}",
+        "new_media_showing": "made a new {media} showing {note}",
         "set_hook": 'set the on-screen text to "{hook}"',
         "resized_smaller": "made the on-screen text smaller",
         "resized_bigger": "made the on-screen text bigger",
@@ -128,6 +132,7 @@ _PHRASES: dict[str, dict[str, str]] = {
     "nl": {
         "photo": "foto", "video": "video",
         "new_media": "een nieuwe {media} gemaakt",
+        "new_media_showing": "een nieuwe {media} gemaakt met {note}",
         "set_hook": 'de tekst in beeld gewijzigd naar "{hook}"',
         "resized_smaller": "de tekst in beeld kleiner gemaakt",
         "resized_bigger": "de tekst in beeld groter gemaakt",
@@ -153,6 +158,10 @@ _PHRASES: dict[str, dict[str, str]] = {
 }
 
 
+# Words that are never a name, so a leading capital on them is just a stray one.
+_ARTICLES = {"a", "an", "the", "een", "de", "het"}
+
+
 def summarise_edit(
     *,
     post_type: str,
@@ -163,6 +172,7 @@ def summarise_edit(
     caption_followed_asset: bool,
     version_number: int,
     text_resized: float | None = None,  # <1 smaller, >1 bigger
+    media_note: str | None = None,  # what the new image/video shows, in their language
     language: str = "en",
 ) -> str:
     """Say what actually changed, and what did not, in the client's own language.
@@ -181,7 +191,11 @@ def summarise_edit(
     # be reported on its own or the reply claims nothing happened.
     resized = text_resized is not None and text_resized != 1.0
     if media_rerendered:
-        did.append(p["new_media"].format(media=media))
+        did.append(
+            p["new_media_showing"].format(media=media, note=_lead_lower(media_note.strip().rstrip(".")))
+            if media_note
+            else p["new_media"].format(media=media)
+        )
     if hook_changed:
         first_line = (hook_after or "").splitlines()[0].strip() if hook_after else ""
         did.append(p["set_hook"].format(hook=first_line))
@@ -243,6 +257,13 @@ Decide:
   beter en ook de caption", "maak een nieuwe post en een nieuwe caption",
   "verwijs meer naar de blue zones, ook in de caption" -> ["asset","caption"].
   Never silently drop half of what was asked. When in doubt, include "asset".
+- "change_note": when you set "new_scene_prompt", also give a SHORT phrase in the
+  request's language describing what the new image/video SHOWS, so the reply can say
+  what was made. It completes "I made a new photo showing ...", so write a noun
+  phrase, lower case, no sentence, no dash: "Bluey samen met mensen op een terras",
+  "de mascotte die de trap neemt". Describe the picture, never the instruction: for a
+  change of look only, name the scene and the change ("dezelfde scene, maar lichter"),
+  not "een lichtere foto". Null when the media is not changing.
 - "language": the ISO 639-1 code of the language the REQUEST is written in
   ("nl" for Dutch, "en" for English, ...). The reply is written in that language.
 - "clarify": use this INSTEAD of guessing, and write it as a REPLY, not a menu.
@@ -318,7 +339,7 @@ Decide:
   pre-mascot weeks) show people or scenery instead.
 
 Return exactly the keys:
-{"targets","mode","new_scene_prompt","new_hook","caption_template","caption_instruction","text_scale","clarify","language"}"""
+{"targets","mode","new_scene_prompt","new_hook","caption_template","caption_instruction","text_scale","change_note","clarify","language"}"""
 
 
 # ---- "make this like week N" reference resolution ---------------------------
@@ -432,6 +453,16 @@ async def _render_asset(
     else:
         data = await overlay_hook(base, hook, scale=scale)
     return data, base, asset.ext, asset.content_type, asset.cost_eur
+
+
+def _lead_lower(note: str) -> str:
+    """Drop the capital the model sometimes opens with, without touching a name.
+
+    The note lands mid-sentence ("... showing a brighter version"), and only an
+    article can be safely lower-cased: "Bluey" has to keep its capital.
+    """
+    head, _, rest = note.partition(" ")
+    return f"{head.lower()} {rest}".strip() if head.lower() in _ARTICLES else note
 
 
 def _size_hint(scale: float | None) -> str | None:
@@ -713,6 +744,7 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         caption_followed_asset=caption_followed_asset,
         version_number=version.version_number,
         text_resized=plan.text_scale if wants_asset else None,
+        media_note=plan.change_note if (media_rerendered and plan.new_scene_prompt) else None,
         language=plan.language,
     )
     return EditResult(

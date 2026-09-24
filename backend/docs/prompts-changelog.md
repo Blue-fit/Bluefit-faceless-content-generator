@@ -1,5 +1,16 @@
 # Prompts changelog
 
+## 2026-09-24 - the reply names what was made
+- `tools/edit_post.py` `_CLASSIFY` - new `change_note`: whenever the classifier sets
+  `new_scene_prompt` it also writes a short noun phrase, in the client's language,
+  describing what the NEW image or video shows ("Bluey samen met mensen op een
+  terras"). It completes "ik heb een nieuwe foto gemaakt met ...", so it is lower
+  case and describes the picture, not the instruction: a look-only change reads
+  "dezelfde scene, maar lichter", never "een lichtere foto". Null when the media is
+  not changing. Reason: the reply said "ik heb een nieuwe foto gemaakt" without
+  saying what of, so the client had to open the post to find out whether the edit
+  was what they asked for.
+
 ## 2026-09-22 (b) - edit fixes from a production audit
 - `tools/edit_post.py` `_CLASSIFY` - asking the POST ITSELF to say something now
   rewrites the on-screen text: "vertel iets in de post zelf over X", "zeg iets in de
