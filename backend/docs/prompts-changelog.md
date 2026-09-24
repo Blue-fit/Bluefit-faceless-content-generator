@@ -1,6 +1,13 @@
 # Prompts changelog
 
 ## 2026-09-22 (b) - edit fixes from a production audit
+- `tools/edit_post.py` `_CLASSIFY` - asking the POST ITSELF to say something now
+  rewrites the on-screen text: "vertel iets in de post zelf over X", "zeg iets in de
+  tekst over X" set `new_hook` (and `new_scene_prompt` too when the same message also
+  asks for a different scene). Seen live: the client asked the post to talk about
+  community and got a new photo and caption while the on-screen text stayed put.
+  Naming a TOPIC is also declared concrete, so "zeg iets over mobiliteit" no longer
+  goes to clarify. "Laat zien in de foto" stays a scene change, not a text change.
 - `tools/edit_post.py` `_CLASSIFY` - the clarification is now a REPLY, not a menu:
   it first answers or acknowledges what the client said, then asks what to change and
   names the options, in their language and naming THIS post's medium (foto vs video).

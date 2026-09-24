@@ -270,7 +270,10 @@ Decide:
   the message is not a change request at all: praise, a bare command with no object
   ("doe het", "fix het"), or a complaint about a previous edit ("er verandert niks
   in de post"). Never edit a post on the strength of a compliment.
-  A request that names something concrete is NOT vague: act on it normally.
+  A request that names something concrete is NOT vague: act on it normally. Naming a
+  TOPIC to talk about counts as concrete ("zeg iets in de tekst over mobiliteit"),
+  even though the exact wording is left to you. Only ask when you genuinely cannot
+  tell WHAT to change.
   Whenever you set "clarify", return "targets": [].
 - "mode": "tweak" (small change to the same concept), "regenerate" (same concept,
   a fresh take), or "rewrite" (a meaningfully different concept).
@@ -281,6 +284,13 @@ Decide:
   user changes it; action/setting/mood only, no style words; any real people
   faceless. To keep the same media and change ONLY the on-screen text, leave
   "new_scene_prompt" null. For "regenerate" leave it null.
+- Asking the POST ITSELF to say or tell something is a request to rewrite the
+  ON-SCREEN TEXT, and you write the words: "vertel iets in de post zelf over X",
+  "zeg iets in de tekst over X", "laat de tekst over X gaan", "vertel in de video
+  iets over X" all mean set "new_hook" to a new hook about X. This is NOT vague and
+  must never go to "clarify": naming the topic is enough, inventing the wording is
+  your job. If the same message ALSO asks for a different scene ("laat bluey samen
+  zijn met mensen"), set "new_scene_prompt" as well, so both change together.
 - If the user wants DIFFERENT on-screen HOOK words (not merely resizing), set
   "new_hook" to the new short hook text — a few punchy words, in the SAME language
   as the post. Use target "asset". Leave "new_scene_prompt" null to keep the exact

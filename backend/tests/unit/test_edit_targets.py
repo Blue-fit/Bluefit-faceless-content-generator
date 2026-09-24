@@ -85,3 +85,18 @@ def test_classifier_asks_for_a_reply_not_a_menu() -> None:
     # the three real messages that must get a human answer
     for msg in ("dit kan echt beter", "wat is er verkeerd gegaan?", "heb ik gebruikt!"):
         assert msg in _CLASSIFY
+
+
+def test_asking_the_post_to_say_something_rewrites_the_on_screen_text() -> None:
+    """Production miss: "vertel iets in de post zelf over community" changed the
+    photo and the caption but left the on-screen text alone."""
+    assert "Asking the POST ITSELF to say or tell something" in _CLASSIFY
+    assert "vertel iets in de post zelf over X" in _CLASSIFY
+    assert "zeg iets in de tekst over X" in _CLASSIFY
+    assert "set \"new_scene_prompt\" as well, so both change together" in _CLASSIFY
+
+
+def test_a_named_topic_is_concrete_enough_to_act_on() -> None:
+    """Over-eager clarification treated "zeg iets over mobiliteit" as too vague."""
+    assert "Naming a\n  TOPIC to talk about counts as concrete" in _CLASSIFY
+    assert "must never go to \"clarify\"" in _CLASSIFY
