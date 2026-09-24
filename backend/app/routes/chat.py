@@ -15,6 +15,7 @@ from app.meter import SpendCapExceeded
 from app.storage.r2 import R2Uploader
 from app.tools import ToolError
 from app.tools.edit_post import (
+    ChatTurn,
     EditError,
     EditNeedsClarification,
     EditRequest,
@@ -126,7 +127,11 @@ async def chat(
     pool = get_pool()
 
     async with pool.acquire() as conn:
+        # Read the thread BEFORE storing this message, so the history is what came
+        # before it. The agent needs it to recognise an answer to its own question.
+        earlier = await get_messages_for_post(conn, post_id)
         await insert_message(conn, post_id=post_id, role="user", content=body.message)
+    history = [ChatTurn(role=m.role, text=m.content) for m in earlier]  # type: ignore[arg-type]
 
     # A failed edit must never leave the thread silent: catch every failure,
     # save a model reply explaining it, and return 200 so the UI always shows it.
@@ -135,7 +140,7 @@ async def chat(
     msg = _FAILURES[lang]
     try:
         result = await edit_post(
-            EditRequest(post_id=post_id, instruction=body.message),
+            EditRequest(post_id=post_id, instruction=body.message, history=history),
             uploader=R2Uploader(),
         )
         reply = result.summary

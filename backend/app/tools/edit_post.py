@@ -225,10 +225,26 @@ def summarise_edit(
     return reply + p["version"].format(n=version_number)
 
 
+# Enough to answer "what did you just ask me?" without paying for the whole thread.
+_HISTORY_TURNS = 6
+_HISTORY_CHARS = 400
+
+
+class ChatTurn(BaseModel):
+    """One earlier message in this post's thread, oldest first."""
+
+    role: Literal["user", "model"]
+    text: str
+
+
 class EditRequest(BaseModel):
     post_id: UUID
     instruction: str
     override_limit: bool = False
+    # The turns BEFORE this instruction. Without them a reply to the agent's own
+    # question ("de foto") reads as a fresh vague request and gets the same
+    # question back, which is exactly the loop clients ran into.
+    history: list[ChatTurn] = []
 
 
 class EditResult(BaseModel):
@@ -264,6 +280,31 @@ Decide:
   "de mascotte die de trap neemt". Describe the picture, never the instruction: for a
   change of look only, name the scene and the change ("dezelfde scene, maar lichter"),
   not "een lichtere foto". Null when the media is not changing.
+## Reading the conversation
+
+"Conversation so far" is context; "Instruction" is what you must act on now. Use
+the context to understand the instruction, never to re-apply an edit you already
+made.
+
+- **An answer to your own question is not a new request.** If your last message
+  asked what to change and the instruction answers it, MERGE the two and act.
+  "Wat mag anders: de foto, de tekst in beeld, of de caption?" answered with
+  "de photo" means the asset, and the reason sits in the message before it
+  ("breng het aardiger") -> targets ["asset"], carrying that reason into the
+  new scene.
+- **Never ask the same question twice.** Once the client has named the part, that
+  part is settled: do NOT offer the menu again. If you genuinely still need
+  something, ask about THAT PART ONLY, and ask something new and narrower ("wat
+  mag er anders aan de foto: de sfeer, de kleuren, of wie erop staat?").
+  Repeating the list you just offered is the worst reply you can give.
+- **Two clarifications is the limit.** If the context already shows you asking for
+  clarification twice, stop asking: take the most reasonable reading of everything
+  they have said and act on it.
+- A bare "try again", "nog een keer", "opnieuw" repeats the LAST INSTRUCTION the
+  client gave in the context. Find it and act on it again.
+- Typos and half-sentences ("ik zegt de photo photo") still count as an answer
+  when the context makes the meaning obvious.
+
 - "language": the ISO 639-1 code of the language the REQUEST is written in
   ("nl" for Dutch, "en" for English, ...). The reply is written in that language.
 - "clarify": use this INSTEAD of guessing, and write it as a REPLY, not a menu.
@@ -465,6 +506,17 @@ def _lead_lower(note: str) -> str:
     return f"{head.lower()} {rest}".strip() if head.lower() in _ARTICLES else note
 
 
+def _history_block(history: list[ChatTurn]) -> str:
+    """The tail of the thread, as plain speaker-tagged lines."""
+    if not history:
+        return ""
+    lines = [
+        f"{'CLIENT' if t.role == 'user' else 'YOU'}: {t.text.strip()[:_HISTORY_CHARS]}"
+        for t in history[-_HISTORY_TURNS:]
+    ]
+    return "## Conversation so far (oldest first)\n" + "\n".join(lines)
+
+
 def _size_hint(scale: float | None) -> str | None:
     """Turn a relative text-size edit into words the image model can act on."""
     if scale is None or scale == 1.0:
@@ -540,11 +592,13 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
         f"caption: {current.caption}"
     )
     ref_section = f"\n\n{reference}" if reference else ""
+    history = _history_block(req.history)
+    history_section = f"\n\n{history}" if history else ""
     classify = await _classify(
         _ClassifyRequest(
             text=(
                 f"{_CLASSIFY}\n\n## Current post\n{summary}{ref_section}"
-                f"\n\n## Instruction\n{req.instruction}"
+                f"{history_section}\n\n## Instruction\n{req.instruction}"
             ),
             trigger="edit",
             post_id=req.post_id,

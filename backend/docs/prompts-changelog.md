@@ -1,5 +1,19 @@
 # Prompts changelog
 
+## 2026-09-24 (b) - the edit agent can see the conversation
+- `tools/edit_post.py` `_CLASSIFY` - new "Reading the conversation" section, fed by
+  the last 6 turns of the thread. Until now every message was classified alone, so
+  an answer to the agent's own question ("de photo", after it offered "de foto, de
+  tekst in beeld, of de caption?") read as a fresh vague request and earned the
+  identical question back - a loop the client could not escape. The rules: an answer
+  to your own question is merged with that question and acted on; never ask the same
+  question twice, and if something is still missing ask about that part only and ask
+  something narrower; after two clarifications in the thread, stop asking and act on
+  the most reasonable reading; a bare "try again" repeats the client's last real
+  instruction; typos still count as an answer when the context makes it obvious.
+  Verified by replaying the client's real 2026-09-24 thread: all five turns that
+  previously looped now act.
+
 ## 2026-09-24 - the reply names what was made
 - `tools/edit_post.py` `_CLASSIFY` - new `change_note`: whenever the classifier sets
   `new_scene_prompt` it also writes a short noun phrase, in the client's language,

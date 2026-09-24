@@ -46,6 +46,11 @@ modes. It receives an instruction, classifies it, and dispatches the
 appropriate underlying tool. The classification logic lives here, not in
 the agent prompt.
 
+`EditRequest.history` carries the last turns of the thread. The classifier is
+stateless otherwise, and without it a reply to its own clarifying question looks
+like a new vague instruction and gets the same question back. The route reads the
+thread BEFORE storing the incoming message, so history is strictly what came before.
+
 `EditPlan.change_note` is the classifier's one-line description, in the client's
 language, of what the new image/video shows. `summarise_edit()` builds the whole
 reply from facts (no model call), and uses that note so the answer is "I made a new
