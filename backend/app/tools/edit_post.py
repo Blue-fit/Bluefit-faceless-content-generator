@@ -112,6 +112,10 @@ _PHRASES: dict[str, dict[str, str]] = {
         "kept_hook": "the on-screen text is unchanged",
         "kept_media": "the {media} itself is untouched",
         "kept_caption": "the caption is unchanged",
+        "clarify_fallback": (
+            "I am not sure what to change yet. Is it the caption, the text on the "
+            "{media}, or the {media} itself?"
+        ),
         "done": "Done. I {done}.",
         "and": " and ",
         "version": " This is version {n}.",
@@ -133,6 +137,10 @@ _PHRASES: dict[str, dict[str, str]] = {
         "kept_hook": "de tekst in beeld is ongewijzigd",
         "kept_media": "de {media} zelf is ongewijzigd",
         "kept_caption": "de caption is ongewijzigd",
+        "clarify_fallback": (
+            "Ik weet nog niet goed wat ik moet aanpassen. Gaat het om de caption, "
+            "de tekst in beeld, of de {media} zelf?"
+        ),
         "done": "Klaar. Ik heb {done}.",
         "and": " en ",
         "version": " Dit is versie {n}.",
@@ -237,19 +245,33 @@ Decide:
   Never silently drop half of what was asked. When in doubt, include "asset".
 - "language": the ISO 639-1 code of the language the REQUEST is written in
   ("nl" for Dutch, "en" for English, ...). The reply is written in that language.
-- "clarify": use this INSTEAD of guessing. If the request is too vague to act on
-  ("dit kan echt beter", "maak het mooier", "niet goed"), or is a QUESTION rather
-  than an instruction ("wat is er verkeerd gegaan?", "waarom is dit zo?"), return
-  "targets": [] and set "clarify" to a SHORT question in the SAME LANGUAGE as the
-  request, naming the concrete options so they can just pick one — the caption, the
-  text on the image/video, the image/video itself, or the colours/style. Example:
-  "Wat zal ik precies aanpassen: de caption, de tekst in beeld, of de foto zelf?".
-  Also use "clarify" when the message is NOT a change request at all: praise or an
-  acknowledgement ("Deze is nu erg mooi en heb ik gebruikt!"), a bare command with no
-  object ("doe het", "fix het"), or a complaint about a previous edit ("er verandert
-  niks in de post"). Acknowledge briefly and ask what to change — never edit the post
-  on the strength of a compliment.
-  A request that names something concrete is NOT vague — act on it normally.
+- "clarify": use this INSTEAD of guessing, and write it as a REPLY, not a menu.
+  Two short sentences in the SAME LANGUAGE as the request:
+  (a) answer or acknowledge what they actually said, so it reads like a person
+      replying rather than a form, and
+  (b) say you need to know what to change, then name the concrete options: the
+      caption, the text on the image/video, the image/video itself, or the
+      colours/style.
+  Name the medium of THIS post, from `type` in "Current post": say "de foto" for an
+  image and "de video" for a video. Never offer both, and never copy the medium from
+  the examples below.
+  Never use a dash as punctuation. The right register:
+    "dit kan echt beter"
+      -> "Ik snap dat het beter kan, maar ik weet nog niet waar je op doelt. Wat
+          mag anders: de foto, de tekst in beeld, of de caption?"
+    "wat is er verkeerd gegaan?"
+      -> "Er is niets misgegaan, de post staat nog zoals hij was. Wat wil je
+          aanpassen: de foto, de tekst in beeld, of de caption?"
+    "Deze is nu erg mooi en heb ik gebruikt!"
+      -> "Fijn om te horen. Wil je verder nog iets aangepast hebben aan de foto,
+          de tekst in beeld, of de caption?"
+  Use it when the request is too vague to act on ("dit kan echt beter", "maak het
+  mooier", "niet goed"), when it is a QUESTION rather than an instruction, and when
+  the message is not a change request at all: praise, a bare command with no object
+  ("doe het", "fix het"), or a complaint about a previous edit ("er verandert niks
+  in de post"). Never edit a post on the strength of a compliment.
+  A request that names something concrete is NOT vague: act on it normally.
+  Whenever you set "clarify", return "targets": [].
 - "mode": "tweak" (small change to the same concept), "regenerate" (same concept,
   a fresh take), or "rewrite" (a meaningfully different concept).
 - For an asset tweak/rewrite that should change the video/image itself, set
@@ -498,10 +520,12 @@ async def edit_post(req: EditRequest, *, uploader: AssetUploader) -> EditResult:
     wants_caption = "caption" in plan.targets
     # Ask rather than guess: a vague request costs only the classify call above.
     if plan.clarify or not plan.targets:
+        # The fallback only runs if the classifier gave no question of its own; it
+        # still has to speak the client's language and name the right medium.
+        phrases = _PHRASES.get(plan.language.lower()[:2], _PHRASES["en"])
+        media = phrases["video"] if post.type == "video" else phrases["photo"]
         raise EditNeedsClarification(
-            plan.clarify
-            or "Wat zal ik precies aanpassen: de caption, de tekst in beeld, "
-            "of de foto/video zelf?"
+            plan.clarify or phrases["clarify_fallback"].format(media=media)
         )
 
     # Asset first, so a caption written afterwards reflects the NEW scene/hook.

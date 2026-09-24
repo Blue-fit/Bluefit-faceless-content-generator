@@ -66,3 +66,22 @@ def test_clarification_carries_its_question() -> None:
     exc = EditNeedsClarification("Wat zal ik aanpassen?")
     assert exc.question == "Wat zal ik aanpassen?"
     assert str(exc) == "Wat zal ik aanpassen?"
+
+
+def test_clarify_fallback_exists_in_every_language() -> None:
+    """A hardcoded Dutch fallback used to reach English speakers too."""
+    from app.tools.edit_post import _PHRASES
+
+    for lang, phrases in _PHRASES.items():
+        assert "clarify_fallback" in phrases, lang
+        assert "{media}" in phrases["clarify_fallback"], lang
+        assert "—" not in phrases["clarify_fallback"], lang
+
+
+def test_classifier_asks_for_a_reply_not_a_menu() -> None:
+    assert "write it as a REPLY, not a menu" in _CLASSIFY
+    assert "acknowledge what they actually said" in _CLASSIFY
+    assert "Never use a dash as punctuation" in _CLASSIFY
+    # the three real messages that must get a human answer
+    for msg in ("dit kan echt beter", "wat is er verkeerd gegaan?", "heb ik gebruikt!"):
+        assert msg in _CLASSIFY

@@ -1,6 +1,11 @@
 # Prompts changelog
 
 ## 2026-09-22 (b) - edit fixes from a production audit
+- `tools/edit_post.py` `_CLASSIFY` - the clarification is now a REPLY, not a menu:
+  it first answers or acknowledges what the client said, then asks what to change and
+  names the options, in their language and naming THIS post's medium (foto vs video).
+  The fallback question was hardcoded Dutch and would have reached English speakers;
+  it is now per-language in `_PHRASES`. No dashes in any client-facing copy.
 - `tools/edit_post.py` `_CLASSIFY` - new "language": the classifier reports the ISO code
   of the request so every reply is written in the language the client is using. The
   client writes Dutch and was being answered in English.
