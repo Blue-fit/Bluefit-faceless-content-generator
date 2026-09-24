@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import PostingChecklist from '../components/PostingChecklist'
 import { useParams, Navigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { sendChatMessage, fetchExplain } from '../api'
@@ -236,6 +237,8 @@ export default function WeekPage() {
           <span className={styles.readyBadge}>{week.posts.length} posts ready</span>
         </div>
       </div>
+
+      <PostingChecklist />
 
       <div className={styles.posts}>
         {week.posts.map(post => (

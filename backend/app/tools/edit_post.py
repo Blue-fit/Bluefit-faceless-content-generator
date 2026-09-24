@@ -112,12 +112,12 @@ _PHRASES: dict[str, dict[str, str]] = {
         "kept_hook": "the on-screen text is unchanged",
         "kept_media": "the {media} itself is untouched",
         "kept_caption": "the caption is unchanged",
-        "done": "Done — I {done}.",
+        "done": "Done. I {done}.",
         "and": " and ",
         "version": " This is version {n}.",
         "nothing": (
             "I could not change anything on this post (still version {n}). Tell me "
-            "specifically what to change — the caption, the text in the image, or "
+            "specifically what to change: the caption, the text in the image, or "
             "the {media} itself."
         ),
     },
@@ -133,12 +133,12 @@ _PHRASES: dict[str, dict[str, str]] = {
         "kept_hook": "de tekst in beeld is ongewijzigd",
         "kept_media": "de {media} zelf is ongewijzigd",
         "kept_caption": "de caption is ongewijzigd",
-        "done": "Klaar — ik heb {done}.",
+        "done": "Klaar. Ik heb {done}.",
         "and": " en ",
         "version": " Dit is versie {n}.",
         "nothing": (
             "Ik heb niets kunnen wijzigen aan deze post (nog steeds versie {n}). Zeg "
-            "precies wat ik moet aanpassen — de caption, de tekst in beeld, of de "
+            "precies wat ik moet aanpassen: de caption, de tekst in beeld, of de "
             "{media} zelf."
         ),
     },

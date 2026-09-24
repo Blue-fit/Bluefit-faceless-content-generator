@@ -47,15 +47,15 @@ _FAILURES: dict[str, dict[str, str]] = {
     "en": {
         "cap": (
             "This month's generation budget has been reached, so your post was not "
-            "changed. Nothing is broken — the cap resets next month, or it can be raised."
+            "changed. Nothing is broken. The cap resets next month, or it can be raised."
         ),
         "tool": (
-            "That edit failed and your post is unchanged — the generation service hit a "
+            "That edit failed and your post is unchanged. The generation service hit a "
             "temporary error. Please try again in a moment."
         ),
         "quota": (
             "The generation service is out of credit right now, so your post was not "
-            "changed. This is on our side, not your edit — we have been alerted."
+            "changed. This is on our side, not your edit. We have been alerted."
         ),
         "busy": (
             "The generation service is busy right now and your post was not changed. "
@@ -70,15 +70,15 @@ _FAILURES: dict[str, dict[str, str]] = {
     "nl": {
         "cap": (
             "Het budget voor deze maand is bereikt, dus je post is niet gewijzigd. Er is "
-            "niets kapot — het budget gaat volgende maand weer open, of we verhogen het."
+            "niets kapot. Het budget gaat volgende maand weer open, of we verhogen het."
         ),
         "tool": (
-            "Die bewerking is mislukt en je post is ongewijzigd — de generatieservice gaf "
+            "Die bewerking is mislukt en je post is ongewijzigd. De generatieservice gaf "
             "een tijdelijke fout. Probeer het zo nog eens."
         ),
         "quota": (
             "De generatieservice heeft op dit moment geen tegoed, dus je post is niet "
-            "gewijzigd. Dat ligt aan ons, niet aan jouw bewerking — we zijn op de hoogte."
+            "gewijzigd. Dat ligt aan ons, niet aan jouw bewerking. We zijn op de hoogte."
         ),
         "busy": (
             "De generatieservice is nu druk en je post is niet gewijzigd. Probeer het "
