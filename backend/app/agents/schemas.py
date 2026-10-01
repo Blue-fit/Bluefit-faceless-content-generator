@@ -48,7 +48,14 @@ class TrendTheme(BaseModel):
     title: str = Field(description="Short headline for the theme.")
     summary: str = Field(description="What the theme is, in 1-2 sentences.")
     why_relevant: str = Field(description="Why it fits Blue Fit / its pillars.")
-    source_url: str = Field(description="Where the theme was found.")
+    source_url: str | None = Field(
+        default=None,
+        description=(
+            "Where the theme was found. The researcher must cite one; the pipeline "
+            "nulls it when the page turns out not to exist, since a dead link is "
+            "worse provenance than none."
+        ),
+    )
     action: str = Field(
         description="The ONE thing the viewer does, imperative and concrete, in Dutch."
     )

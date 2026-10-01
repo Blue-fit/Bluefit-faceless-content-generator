@@ -211,3 +211,37 @@ def test_a_clinical_caption_is_sent_back_to_the_generator() -> None:
               "Loop twee minuten na het eten. Dit verlaagt je risico op diabetes.")
     ])
     assert any("medical claim" in p for p in _post_action_violations(out))
+
+
+# ---- provenance ----------------------------------------------------------------
+
+
+def test_a_dead_link_is_dropped_rather_than_stored() -> None:
+    """Half a week's sources were dead on arrival; a lie is worse than a blank."""
+    from app.agents.pipeline import _source_verdict
+
+    assert _source_verdict(404, "https://example.nl/gone") is None
+    assert _source_verdict(410, "https://example.nl/gone") is None
+    assert _source_verdict(None, "https://example.nl/timeout") is None
+
+
+def test_an_expired_grounding_redirect_is_never_stored() -> None:
+    """Google's redirects 404 within seconds of being minted."""
+    from app.agents.pipeline import _GROUNDING_HOST, _source_verdict
+
+    assert _source_verdict(200, f"https://{_GROUNDING_HOST}/grounding-api-redirect/abc") is None
+
+
+def test_a_page_that_refuses_us_is_still_a_page() -> None:
+    """403 behind a bot wall, 429 rate-limited, 503 a bad day: the article exists."""
+    from app.agents.pipeline import _source_verdict
+
+    for status in (200, 403, 429, 503):
+        assert _source_verdict(status, "https://example.nl/real") == "https://example.nl/real"
+
+
+def test_a_dose_said_in_words_counts_as_a_dose() -> None:
+    """'Elk half uur' was rejected in live testing and cost a needless retry."""
+    assert _has_dose("Elk half uur")
+    assert _has_dose("ieder kwartier")
+    assert _has_dose("een half uur na het opstaan")

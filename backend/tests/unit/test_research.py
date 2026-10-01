@@ -59,8 +59,17 @@ def test_prose_is_rejected() -> None:
 
 def test_theme_missing_a_required_field_is_rejected() -> None:
     bad = _theme()
-    del bad["source_url"]  # every theme must cite a source
+    del bad["action"]  # a theme without something to do is not a theme
     assert pipeline._parse_brief(json.dumps({"themes": [bad]}), WEEK) is None
+
+
+def test_a_missing_source_does_not_sink_the_theme() -> None:
+    """The researcher must cite one, but the pipeline nulls dead links anyway, so
+    the schema is not the place to insist on it."""
+    bad = _theme()
+    del bad["source_url"]
+    brief = pipeline._parse_brief(json.dumps({"themes": [bad]}), WEEK)
+    assert brief is not None and brief.themes[0].source_url is None
 
 
 def test_non_object_json_is_rejected() -> None:

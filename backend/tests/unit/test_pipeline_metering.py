@@ -19,7 +19,7 @@ REDIRECT = f"https://{pipeline._GROUNDING_HOST}/grounding-api-redirect/AbC123"
 REAL = "https://www.brownhealth.org/be-well/winter"
 
 
-def _brief(*urls: str) -> TrendBrief:
+def _brief(*urls: str | None) -> TrendBrief:
     return TrendBrief(
         week_start=WEEK,
         themes=[
@@ -32,22 +32,24 @@ def _brief(*urls: str) -> TrendBrief:
 
 
 class _FakeResponse:
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, status_code: int = 200) -> None:
         self.url = url
+        self.status_code = status_code
 
 
 class _FakeClient:
     """Stands in for httpx.AsyncClient(follow_redirects=True)."""
 
-    def __init__(self, final: str | Exception) -> None:
+    def __init__(self, final: str | Exception, status: int = 200) -> None:
         self.final = final
+        self.status = status
         self.calls: list[str] = []
 
     async def get(self, url: str) -> _FakeResponse:
         self.calls.append(url)
         if isinstance(self.final, Exception):
             raise self.final
-        return _FakeResponse(self.final)
+        return _FakeResponse(self.final, self.status)
 
 
 # ---- single-URL resolution -------------------------------------------------------
@@ -60,43 +62,56 @@ async def test_redirect_resolves_to_the_real_article() -> None:
 
 
 @pytest.mark.asyncio
-async def test_network_failure_keeps_the_original_url() -> None:
+async def test_network_failure_drops_the_source() -> None:
+    """A URL we could not reach is a URL we cannot vouch for."""
     client = _FakeClient(httpx.ConnectError("boom"))
-    assert await pipeline._resolve_source(client, REDIRECT) == REDIRECT  # type: ignore[arg-type]
+    assert await pipeline._resolve_source(client, REDIRECT) is None  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
-async def test_unresolved_redirect_is_not_stored_as_the_answer() -> None:
-    """If we land back on the grounding host, keep the original rather than a dud."""
+async def test_an_expired_redirect_is_dropped() -> None:
+    """Landing back on the grounding host means it never reached a publisher."""
     client = _FakeClient(f"https://{pipeline._GROUNDING_HOST}/still-here")
-    assert await pipeline._resolve_source(client, REDIRECT) == REDIRECT  # type: ignore[arg-type]
+    assert await pipeline._resolve_source(client, REDIRECT) is None  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_a_404_is_dropped_but_a_403_is_kept() -> None:
+    """Gone is not a source; refusing us is still a page."""
+    assert await pipeline._resolve_source(_FakeClient(REAL, 404), REDIRECT) is None  # type: ignore[arg-type]
+    assert await pipeline._resolve_source(_FakeClient(REAL, 403), REDIRECT) == REAL  # type: ignore[arg-type]
 
 
 # ---- brief-level resolution ------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_only_grounding_urls_are_resolved(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_every_source_is_checked_not_just_redirects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The researcher invents plausible URLs too, so a direct link proves nothing."""
     seen: list[str] = []
 
-    async def fake_resolve(_client: Any, url: str) -> str:
+    async def fake_resolve(_client: Any, url: str) -> str | None:
         seen.append(url)
-        return REAL
+        return None if "already.real" in url else REAL
 
     monkeypatch.setattr(pipeline, "_resolve_source", fake_resolve)
     out = await pipeline._resolve_sources(_brief(REDIRECT, "https://already.real/x"))
 
-    assert seen == [REDIRECT]  # the already-real URL is left alone
-    assert [t.source_url for t in out.themes] == [REAL, "https://already.real/x"]
+    assert sorted(seen) == sorted([REDIRECT, "https://already.real/x"])
+    assert [t.source_url for t in out.themes] == [REAL, None]
 
 
 @pytest.mark.asyncio
-async def test_brief_without_redirects_short_circuits(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_a_brief_with_no_sources_short_circuits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async def explode(*_a: Any, **_k: Any) -> Any:  # pragma: no cover - must not run
         raise AssertionError("should not open a client")
 
     monkeypatch.setattr(pipeline.httpx, "AsyncClient", explode)
-    brief = _brief("https://already.real/x")
+    brief = _brief(None)
     assert await pipeline._resolve_sources(brief) is brief
 
 

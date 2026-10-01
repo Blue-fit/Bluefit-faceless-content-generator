@@ -45,6 +45,11 @@ date, file changed, and reason.
   (shares the single correction call with `_enforce_value_rules` rather
   than buying a third generator retry). Both are fail-soft: a thin brief
   still beats no posts.
+- **Sources are verified, not trusted.** `_resolve_sources` fetches every
+  `source_url` and nulls the ones that 404/410 or cannot be reached, so
+  `TrendTheme.source_url` is optional by the time anything reads it. Both
+  expired grounding redirects and URLs the researcher invented were being
+  stored as provenance.
 
 ## Tool dispatch boundary
 

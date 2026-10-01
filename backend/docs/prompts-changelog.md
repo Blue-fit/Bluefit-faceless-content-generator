@@ -1,5 +1,23 @@
 # Prompts changelog
 
+## 2026-10-01 (d) - a dead link is worse provenance than none
+- `agents/pipeline.py` + `agents/schemas.py` - every `source_url` is now fetched and
+  verified at research time, and nulled when the page does not exist. An audit found
+  8 of 16 themes citing a URL that did not load: expired Google grounding redirects
+  (they 404 within seconds of being minted) plus plain-looking URLs the researcher
+  had assembled itself. `reasoning_blob.theme_source_url` is what we show when
+  someone asks where a claim came from, so it may now be empty but is never a lie.
+  404 and 410 are dead; 403, 429 and 5xx mean the page exists and would not serve
+  us, so those are kept. Verified live: 11 sources kept and alive, 4 dropped, 0
+  stored-but-dead.
+- `agents/prompts/researcher.md` - cite the page you actually read, never assemble a
+  plausible one. **A weak link never costs a theme**, since the pipeline clears the
+  URL itself; only a weak action does. Added after the first wording made the model
+  so cautious it returned a single theme for a week. "Return 4 to 6 themes" is now
+  stated as a hard floor.
+- `agents/pipeline.py` - "Elk half uur" was rejected as doseless and cost a retry; a
+  dose may state its amount in words.
+
 ## 2026-10-01 (c) - no medical claims, enforced in code
 - `agents/prompts/researcher.md` + `agents/pipeline.py` - a researcher audit over 14
   live themes found one payoff claiming "je vermindert het risico op

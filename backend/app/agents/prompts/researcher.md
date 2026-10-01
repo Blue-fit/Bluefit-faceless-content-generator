@@ -144,7 +144,14 @@ Worked example of the shape:
 }
 ```
 
-Every theme must cite a real `source_url` found via search. If a search yields
-nothing usable for a theme, drop that theme rather than inventing a source — and
-drop a theme whose action you cannot make concrete rather than padding it with a
-vague one. Four strong protocols beat six explainers.
+Cite a real `source_url`: the address of the page you actually read. **Every URL is
+fetched and checked on our side**, and one that does not load is discarded, so a
+plausible-looking link you assembled yourself buys nothing. Never invent one.
+
+**A weak link never costs you a theme.** We check and clear the URL ourselves, so a
+theme you are sure about still ships with the best citation you have. The only
+reason to drop a theme is a weak **action**: one you cannot make concrete, that
+needs something bought, or that nobody could tick off tonight. Drop those rather
+than padding them with vague advice.
+
+**Return 4 to 6 themes.** Fewer than four is a failed brief: keep looking.

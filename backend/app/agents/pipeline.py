@@ -120,38 +120,82 @@ def _parse_brief(text: str, week_start: date) -> TrendBrief | None:
         return None
 
 
-async def _resolve_source(client: httpx.AsyncClient, url: str) -> str:
-    """The article a grounding redirect points at (the original URL on failure).
+# A page that refuses US is still a page; a page that is GONE is not a source.
+# 401/403 (bot wall), 429 (rate limit) and 5xx (the publisher is having a bad day)
+# all mean "exists, wouldn't serve us", so the URL is kept.
+_DEAD_STATUSES = frozenset({404, 410})
+# Without a browser agent a fair number of publishers answer a bare client with 403,
+# and a kept-but-403 source is weaker provenance than a verified one.
+_FETCH_HEADERS = {
+    "user-agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    )
+}
 
-    A 4xx from the publisher still redirects first, so the final URL is usable even
-    when the page itself refuses our request.
+
+def _source_verdict(status: int | None, final_url: str) -> str | None:
+    """The URL worth storing, or None when there is nothing honest to store.
+
+    Pure, so the rules are testable without a network. `status` is None when the
+    request itself failed.
+    """
+    if _GROUNDING_HOST in final_url:
+        # Google's redirect never reached a publisher: it 404s within seconds of
+        # being minted, so what we hold is a link that was never going to work.
+        return None
+    if status is None or status in _DEAD_STATUSES:
+        return None
+    return final_url
+
+
+async def _resolve_source(client: httpx.AsyncClient, url: str) -> str | None:
+    """Follow a source to the real article, or None if it does not exist.
+
+    Half of a week's sources used to be dead on arrival: expired grounding
+    redirects, plus plain-looking URLs the researcher invented. Storing one of
+    those is worse than storing nothing, because `reasoning_blob.theme_source_url`
+    is what we show when someone asks where a claim came from.
     """
     try:
         resp = await client.get(url)
     except httpx.HTTPError as exc:
-        logger.warning("research.source_unresolved", url=url[:80], error=str(exc)[:120])
-        return url
-    final = str(resp.url)
-    return url if _GROUNDING_HOST in final else final
+        logger.warning("research.source_unreachable", url=url[:80], error=str(exc)[:120])
+        return _source_verdict(None, url)
+    return _source_verdict(resp.status_code, str(resp.url))
 
 
 async def _resolve_sources(brief: TrendBrief) -> TrendBrief:
-    """Replace grounding redirects in `brief` with the real article URLs.
+    """Resolve every source to a real article, and drop the ones that aren't.
 
-    Best-effort and never fatal: a theme keeps its redirect if resolution fails.
+    Best-effort and never fatal: a theme with a dead source keeps the theme and
+    loses the link. Research is free to be right about a protocol and wrong about
+    where it read it.
     """
-    targets = sorted({t.source_url for t in brief.themes if _GROUNDING_HOST in t.source_url})
+    targets = sorted({t.source_url for t in brief.themes if t.source_url})
     if not targets:
         return brief
-    async with httpx.AsyncClient(follow_redirects=True, timeout=_RESOLVE_TIMEOUT) as client:
-        resolved = await asyncio.gather(*(_resolve_source(client, u) for u in targets))
-    mapping = dict(zip(targets, resolved, strict=True))
-    logger.info("research.sources_resolved", resolved=sum(1 for u in targets if mapping[u] != u),
-                total=len(targets))
+    async with httpx.AsyncClient(
+        follow_redirects=True, timeout=_RESOLVE_TIMEOUT, headers=_FETCH_HEADERS
+    ) as client:
+        checked = await asyncio.gather(*(_resolve_source(client, u) for u in targets))
+    mapping = dict(zip(targets, checked, strict=True))
+    dropped = [u for u in targets if mapping[u] is None]
+    if dropped:
+        logger.warning(
+            "research.sources_dropped", count=len(dropped), total=len(targets),
+            urls=[u[:80] for u in dropped[:5]],
+        )
+    logger.info(
+        "research.sources_resolved",
+        verified=len(targets) - len(dropped), total=len(targets),
+    )
     return brief.model_copy(
         update={
             "themes": [
-                t.model_copy(update={"source_url": mapping.get(t.source_url, t.source_url)})
+                t.model_copy(
+                    update={"source_url": mapping.get(t.source_url) if t.source_url else None}
+                )
                 for t in brief.themes
             ]
         }
@@ -173,6 +217,8 @@ _DOSE_TRIGGERS: tuple[str, ...] = (
     "voor het slapen", "elke ochtend", "elke avond", "dagelijks", "per dag", "per week",
     "s ochtends", "s avonds", "tijdens", "voordat", "nadat", "iedere", "elke",
     "wakker word", "thuiskom", "het douchen",
+    # "Elk half uur" was rejected in testing: a dose can say its amount in words.
+    "elk ", "ieder ", "half uur", "kwartier", "kwartiertje",
 )
 
 
@@ -685,7 +731,7 @@ def _reasoning_blob(
     rule_ids: list[UUID],
     asset_model: str,
     base_asset_url: str,
-    theme_sources: dict[str, str] | None = None,
+    theme_sources: dict[str, str | None] | None = None,
 ) -> dict:
     r = spec.references_used
     return {
