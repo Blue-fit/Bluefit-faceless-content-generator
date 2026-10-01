@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from app.agents import pipeline
-from app.agents.schemas import PostReferences, PostSpec
+from app.agents.schemas import PostReferences, PostSpec, PostTakeaway
 
 WEEK = date(2026, 9, 25)
 
@@ -21,6 +21,10 @@ def _theme(title: str = "Hara hachi bu") -> dict[str, str]:
         "title": title,
         "summary": "Stop eating at 80% full.",
         "why_relevant": "Natural Eating / The 80% rule",
+        "action": "Leg je bestek neer bij tweederde van je bord",
+        "dose": "elke warme maaltijd, 1 keer per dag",
+        "payoff": "Je voelt je na het eten lichter en zakt 's middags minder weg",
+        "evidence": "Okinawanen stoppen rond 80% verzadiging en eten daardoor minder.",
         "source_url": "https://example.nl/80",
     }
 
@@ -141,8 +145,10 @@ def _spec(theme: str | None) -> PostSpec:
         pillar="Natural Eating",
         type="image",
         scene_prompt="The Blue Fit mascot in a kitchen",
+        takeaway=PostTakeaway(action="Neem de trap", dose="1 keer per dag",
+                              payoff="Je benen worden sterker"),
         caption_template="question",
-        caption="c",
+        caption="Neem vandaag de trap.",
         references_used=PostReferences(theme=theme, value="The 80% rule"),
     )
 

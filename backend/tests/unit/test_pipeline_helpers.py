@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 
 from app.agents import pipeline
-from app.agents.schemas import PostReferences, PostSpec
+from app.agents.schemas import PostReferences, PostSpec, PostTakeaway
 from app.tools.memory_search import RecentPost
 
 
@@ -45,8 +45,10 @@ def test_reasoning_blob_carries_beat_and_mascot_version(
         type="image",
         scene_prompt="The Blue Fit mascot on the stairs",
         beat="looks back as if to say 'coming?'",
+        takeaway=PostTakeaway(action="Neem de trap", dose="1 keer per dag",
+                              payoff="Je benen worden sterker"),
         caption_template="question",
-        caption="c",
+        caption="Neem vandaag de trap.",
         references_used=PostReferences(theme="t", value="Move naturally"),
     )
     blob = pipeline._reasoning_blob(spec, [], [], "img-model", "https://r2/base.jpg")

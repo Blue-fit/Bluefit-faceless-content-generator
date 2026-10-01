@@ -1,5 +1,73 @@
 # Prompts changelog
 
+## 2026-10-01 (c) - no medical claims, enforced in code
+- `agents/prompts/researcher.md` + `agents/pipeline.py` - a researcher audit over 14
+  live themes found one payoff claiming "je vermindert het risico op
+  gezondheidsproblemen", and two evidence lines built on mortality findings ("een
+  lagere kans op overlijden", "een forse daling van het sterfterisico"). The prompt
+  already forbade clinical wording; it needed the mortality/risk case spelled out,
+  and a gate. `_clinical_claims()` now blocks risk, mortality, treatment and
+  diagnosis language in a theme's payoff AND evidence (the evidence becomes a
+  caption line), and again in the generated caption. Organ words stay legal:
+  "verlagen de hartslag, bloeddruk en stresshormonen" is a body doing something.
+  Calibrated against 11 real lines from the audit, 0 mismatches. Re-audited over 16
+  fresh themes: no vague actions, no missing doses, no medical claims.
+
+## 2026-10-01 (b) - the caption has to be worth reading, and sound like us
+- `agents/prompts/generator.md` - two additions to the caption, after the action
+  landed but the back half stayed generic. (1) **The "why it works" line must earn
+  its place**: it has to be a counter-intuitive fact, a reframe, or a comparison
+  that shows the size of the effect - never the textbook fact everyone already has.
+  The three live captions before this change ended on "blauw licht blokkeert dit
+  natuurlijke proces", "je lichaam heeft urenlang niets gedronken" and "rekken
+  warmt het lichaam op". Nobody saves a post for that. (2) **The caption must tie
+  the action back to its pillar or Power-9 value**, in our words and woven into a
+  sentence, never as a slogan or a label - it is what makes it a Blue Fit post
+  rather than a wellness tip anyone could publish. Caption length 3-5 -> 4-6
+  sentences to fit both without crowding out the action.
+- `agents/prompts/researcher.md` - `evidence` must now carry the part a reader
+  would NOT already know, with one more search if the source only confirms the
+  obvious. Same lesson as the action: the generator cannot write a surprising line
+  from an unsurprising brief.
+- `agents/prompts/generator.md` - **the nine Power-9 values now carry one-line
+  definitions.** They were listed by name only, so the model guessed: a live run
+  wrote "Dit is de 80%-regel in de praktijk: kleine, bewuste keuzes", when hara
+  hachi bu means stop eating at 80% full and nothing else. Values must be used for
+  what they actually are.
+- `agents/prompts/generator.md` - the value is written as a **Dutch idea, never its
+  English name**: "de mensen direct om je heen", not "de ware kracht van 'Social
+  circles'", which read like a brand deck leaked into the feed. Plus a hard size
+  rule (4-6 sentences, under 900 characters) after captions ballooned to ten
+  sentences once the back half had more to do, and "no em dashes".
+- `agents/schemas.py` + `tools/generate_caption.py` - em dashes are stripped in code
+  (`strip_em_dashes`), on both the weekly and the edit path. Typographic rules do
+  not survive on prompt instruction alone: the model reaches for a dash whenever a
+  clause runs on.
+- `agents/prompts/caption_{question,hottake,observation}.md` - both rules repeated,
+  so an edit-time caption rewrite holds the same bar.
+
+## 2026-10-01 - a theme is a protocol, not a topic
+- `agents/prompts/researcher.md` - rewritten around the job of finding **protocols**.
+  A theme must now carry an `action`, a `dose`, a `payoff` and one line of
+  `evidence`, and must pass: could a member do this today, without buying anything,
+  and know tonight whether they did it? Search for the intervention and its dose
+  ("hoeveel minuten wandelen na het eten"), not the subject ("waarom bewegen gezond
+  is"). The vague register is banned by name - beweeg meer, wees bewust, neem rust -
+  because those are the phrases the failing captions ended on. Payoffs may be
+  physical ("je bloedsuiker piekt minder") but never clinical. Reason: three of the
+  last five video captions gave the viewer nothing to do; see `docs/decisions/011`.
+- `agents/prompts/generator.md` - new "Every post hands the viewer something to do"
+  section. The video `beat` is now the action being PERFORMED by Bluey, not a
+  metaphor for it. Caption order fixed for all 3 posts: pay off the hook in one
+  sentence, then the action with its dose by sentence two, then the payoff, one line
+  of why, and the comment prompt. At most one sentence of philosophy first. New
+  `takeaway` field on every PostSpec.
+- `agents/prompts/caption_{question,hottake,observation}.md` - the weak "give one
+  concrete piece of advice" clause replaced by the same ordering rule, so an
+  edit-time caption rewrite cannot regress to an explainer. The observation
+  template's "don't instruct" rule relaxed to "don't lecture": the action is still
+  there, offered rather than commanded. New examples in all three.
+
 ## 2026-09-24 (b) - the edit agent can see the conversation
 - `tools/edit_post.py` `_CLASSIFY` - new "Reading the conversation" section, fed by
   the last 6 turns of the thread. Until now every message was classified alone, so

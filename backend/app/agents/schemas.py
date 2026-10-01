@@ -10,9 +10,9 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal, get_args
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-SCHEMA_VERSION = 2  # v2: references_used.value is a required, typed Power-9 anchor
+SCHEMA_VERSION = 3  # v3: themes and posts carry a required action/dose/payoff
 
 Pillar = Literal["Community", "Keep Moving", "Keep Setting Goals", "Natural Eating"]
 # The nine Blue Zones "Power-9" values. Every post is anchored to exactly one, and
@@ -38,12 +38,27 @@ CaptionTemplate = Literal["question", "hottake", "observation"]
 
 
 class TrendTheme(BaseModel):
-    """One abstract, timely theme grounded in a source."""
+    """One theme — a protocol, not a topic.
+
+    A theme without an action produced captions that explained why movement
+    matters and left the viewer with nothing to do. The action, its dose and its
+    payoff are required so the explainer never gets past research.
+    """
 
     title: str = Field(description="Short headline for the theme.")
     summary: str = Field(description="What the theme is, in 1-2 sentences.")
     why_relevant: str = Field(description="Why it fits Blue Fit / its pillars.")
     source_url: str = Field(description="Where the theme was found.")
+    action: str = Field(
+        description="The ONE thing the viewer does, imperative and concrete, in Dutch."
+    )
+    dose: str = Field(
+        description="How much / how often / when: a number or a clear trigger."
+    )
+    payoff: str = Field(
+        description="What they notice from doing it. Specific, never clinical."
+    )
+    evidence: str = Field(description="One line of what source_url actually says.")
     search_query: str | None = Field(
         default=None,
         description="The real search query this theme answers, verbatim (if any).",
@@ -69,6 +84,14 @@ class PostReferences(BaseModel):
     )
     brand_cues: list[str] = Field(default_factory=list)
     rule_applied: str | None = None
+
+
+class PostTakeaway(BaseModel):
+    """What the viewer walks away able to do, carried from the theme's protocol."""
+
+    action: str = Field(description="The one thing the viewer does, imperative, Dutch.")
+    dose: str = Field(description="How much / how often / when.")
+    payoff: str = Field(description="What they notice from doing it.")
 
 
 class PostSpec(BaseModel):
@@ -98,9 +121,32 @@ class PostSpec(BaseModel):
         default=None,
         description="Every post: short on-screen hook text burned onto the asset.",
     )
+    takeaway: PostTakeaway = Field(
+        description="The doable thing this post hands the viewer. Never null."
+    )
     caption_template: CaptionTemplate
     caption: str
     references_used: PostReferences
+
+    @field_validator("caption")
+    @classmethod
+    def _no_em_dashes(cls, v: str) -> str:
+        return strip_em_dashes(v)
+
+
+def strip_em_dashes(text: str) -> str:
+    """Em and en dashes out of client copy, as the client asked.
+
+    Typographic, so the prompt alone can't guarantee it: the model reaches for a
+    dash whenever a clause runs on. "zenuwstelsel—je lichaam" becomes
+    "zenuwstelsel, je lichaam"; a spaced dash was already doing a comma's job.
+    """
+    return (
+        text.replace(" — ", ", ")
+        .replace(" – ", ", ")
+        .replace("—", ", ")
+        .replace("–", ", ")
+    )
 
 
 class GeneratorOutput(BaseModel):

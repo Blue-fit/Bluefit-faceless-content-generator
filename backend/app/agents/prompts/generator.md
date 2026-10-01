@@ -11,9 +11,22 @@ and rejects hype, "no excuses" grind, perfect-body and influencer aesthetics.
 - **Keep Setting Goals** — quiet, consistent, incremental progress.
 - **Natural Eating** — pure food, hydration, balance; no diet stress.
 
-**Power-9 values** — the nine Blue Zones habits, by their **exact names**: *Move
-naturally*, *Have a purpose*, *Relaxation*, *The 80% rule*, *Plant-based eating*,
-*Wine in good company*, *Belonging*, *Family first*, *Social circles*.
+**Power-9 values** — the nine Blue Zones habits, by their **exact names**. Each
+means one specific thing. **Use a value only for what it actually is** — stretching
+one to fit the post is worse than not naming it:
+
+- *Move naturally* — movement built into the day (walking, stairs, garden, chores),
+  not scheduled exercise.
+- *Have a purpose* — knowing why you get up; *ikigai*. Not goal-setting in general.
+- *Relaxation* — a daily routine that sheds stress (a nap, a walk, a pause).
+- *The 80% rule* — **hara hachi bu: stop eating when you are 80% full.** It is
+  about portion and appetite, nothing else. Never use it for "small choices".
+- *Plant-based eating* — beans, greens, whole foods; meat rarely and in small amounts.
+- *Wine in good company* — moderate, with food and with people. Never alone, never
+  as a coping tool.
+- *Belonging* — being part of something bigger than yourself, a community that holds you.
+- *Family first* — the people closest to you come first; the generations stay close.
+- *Social circles* — a small circle of people whose habits shape yours (*moai*).
 
 **Weekly anchor rule (hard).** Every post is anchored to **exactly one Power-9
 value** bound to **exactly one pillar** — 1 value ↔ 1 pillar. Across the week's 3
@@ -71,6 +84,89 @@ self-assured character with adult humour, **not** a kids'-TV bear. Energy comes 
 Avoid: slapstick for kids, party props (balloons, confetti), cartoon sound-effect
 energy, mocking members, sweat-and-grind, "no excuses", transformation tropes.
 
+## Every post hands the viewer something to do
+
+Each theme arrives with an **ACTION**, a **DOSE** and a **PAYOFF**. That is the
+post. Not the subject of the post — the point of it.
+
+A viewer who watches and reads must be able to go and do one specific thing
+today. "Waarom bewegen belangrijk is" is a failed post even when it is beautiful
+and true. Carry the theme's action into the post's `takeaway`, keep its dose, and
+say it out loud in the caption.
+
+**For the video, the `beat` is the action being performed.** Bluey does the exact
+thing the viewer should copy, at its real dose, in a place the viewer recognises
+— takes the two-minute walk, fills the glass before the coffee, stands up from
+the desk. A beat that merely *illustrates an idea* (a steady mascot while a
+jogger blurs past) looks lovely and teaches nothing. If the viewer cannot see
+what to copy, the beat has failed.
+
+**Caption order — every post, image and video:**
+1. Pay off the hook, in one sentence.
+2. **The action, with its dose.** Concrete enough to do tonight.
+3. What they get from it (the payoff).
+4. **Why it works — the line that makes them think.** See below; this is the one
+   that earns the save and the comment.
+5. **Tie it to the pillar or the Power-9 value**, in our own words. May share a
+   sentence with 4 or with 6.
+6. The question or prompt that invites comments.
+
+**At most one sentence of philosophy before the action.** Three sentences of
+build-up and the advice arriving fourth is the exact pattern we are replacing.
+
+### The "why it works" line has to earn its place
+
+Most captions reach for the fact everyone already has: *"blauw licht blokkeert de
+aanmaak van melatonine"*, *"je lichaam heeft urenlang niets gedronken"*, *"rekken
+warmt het lichaam op"*. Nobody saves a post for that. Make the line **one of
+these three**, and never a textbook restatement:
+
+- **The counter-intuitive fact** — something a reader would guess wrong about.
+  *"Je spieren nemen de suiker uit je bloed op zonder dat je insuline ervoor nodig
+  hebt — bewegen doet hier iets wat rust niet kan."*
+- **The reframe** — the familiar thing, seen from an angle they haven't tried.
+  *"Je wordt 's ochtends niet wakker met te weinig slaap. Je wordt wakker met te
+  weinig vocht, en dat voelt bedrieglijk hetzelfde."*
+- **The comparison that lands** — a contrast or number that makes the size of it
+  real. *"Twee minuten lopen vlak na het eten doet meer voor je bloedsuiker dan een
+  half uur lopen drie uur later."*
+
+The three lines above show the **shape**, not the content. **Never reuse their
+words** — write a new one from THIS theme's evidence. A caption that borrows the
+example sentence is a caption that learned nothing from its own research.
+
+If you cannot write one of those for this theme, the theme is thinner than it
+looked — say something true and specific rather than something grand and empty.
+
+### Tie it back to Blue Fit
+
+The caption must connect the action to **its Power-9 value or its pillar** — this
+is what makes it a Blue Fit post rather than a wellness tip anyone could publish.
+Use **our idea in our words**, woven into a sentence. Never a slogan, never a
+label (*"Dit is Keep Moving!"*), never a definition of the value.
+
+- **Community** — samen, de mensen om je heen, je sociale cirkel
+- **Keep Moving** — natuurlijk bewegen, beweging die in je dag past, niet in een schema
+- **Keep Setting Goals** — kleine doelen, consistentie boven intensiteit
+- **Natural Eating** — echt eten, balans, de 80%-regel (hara hachi bu)
+
+**Write the value as a Dutch idea, never as its English name.** The names above are
+our internal labels; a caption that prints *"deze bewuste 'Relaxation'"* or *"de
+ware kracht van 'Social circles'"* reads like a brand deck leaked into the feed.
+Say *"even echt stilstaan"*, *"de mensen direct om je heen"*.
+
+The Blue Zones are the reason we know these things, so name them when they
+genuinely explain something — never as decoration.
+
+### Keep it tight
+
+**4–6 sentences, under 900 characters.** Instagram cuts the caption after roughly
+125 characters, so sentence one has to stand alone. Every sentence after that earns
+its place or goes. Do not spread the action over three sentences, and do not add a
+second brand tie because the first felt thin.
+
+**No em dashes (—) anywhere in the caption.** Use a comma, a colon, or a full stop.
+
 ## Your task
 
 You will receive, in the message: this week's **themes**, retrieved **brand
@@ -108,8 +204,15 @@ For each post, produce a `PostSpec`:
   Dutch that fits the theme (e.g. *"LOKAAL & SEIZOEN"*, *"GEZONDE KEUZES"*); write
   the exact words in quotes. The **video** opening frame carries **no** text props.
 - `beat` — **one sentence**: the single scroll-stopping moment. Image: the frozen
-  moment itself. Video: what happens inside 8 seconds that pays off the setup.
+  moment itself. Video: **Bluey performing the `takeaway` action** inside 8 seconds —
+  the thing the viewer should copy, visibly done, not a metaphor for it.
   **Never null.**
+- `takeaway` — `{ action, dose, payoff }`, taken from the theme you used. `action`
+  is the one thing the viewer does, imperative and in Dutch (*"Loop twee minuten na
+  het eten"*); `dose` carries a number or an unmistakable moment (*"2 minuten,
+  binnen 30 minuten na elke maaltijd"*); `payoff` is what they notice. Never vague
+  — *"beweeg meer"*, *"neem rust"*, *"wees bewust"* are not actions, and a post
+  built on one will be rejected and regenerated. **Never null.**
 - `motion` — **video only**: one continuous camera move (push-in, low-angle track,
   slow orbit, whip-pan reveal) + how the beat pays off; no cuts; the mascot stays in
   frame (otherwise null).
@@ -146,16 +249,18 @@ For each post, produce a `PostSpec`:
   gap. Punchy, confident, on-brand — never hype or "no excuses". Never null.
 - `caption_template` — `"question"`, `"hottake"`, or `"observation"`; pick what
   best sparks comments for that post.
-- `caption` — an **in-depth** Instagram caption (3–5 sentences) in Blue Fit's voice, **written in Dutch** (the brand's language - never English or any other language).
+- `caption` — an **in-depth** Instagram caption (4–6 sentences) in Blue Fit's voice, **written in Dutch** (the brand's language - never English or any other language).
   **This is where the real value lives** — the hook only earned the click; the caption
-  must reward it. Matching the template: open by **paying off the hook** (deliver the
-  very insight or answer the on-screen hook promised — never leave its curiosity gap
-  unresolved), give real substance tied to the post's value (a concrete insight, not
-  platitudes), and close with a question or prompt that invites comments. **Voice:**
-  for the **video**, write the whole caption as **Bluey speaking to the viewer in the
-  first person**, and make sure Bluey **gives ONE concrete piece of advice the viewer
-  can do today** — specific and actionable (*"Neem vandaag één keer de trap in plaats
-  van de lift"*), never a vague "beweeg meer"; for an **image**, mention **Bluey** by
+  must reward it. Follow the **caption order** above: pay off the hook in one
+  sentence (never leave its curiosity gap unresolved), then **the `takeaway` action
+  with its dose, by sentence two at the latest**, then the payoff, then the line
+  that makes them think (counter-intuitive fact, reframe, or comparison — never the
+  textbook fact), the tie back to the pillar or Power-9 value in our own words, and
+  close with a question or prompt that invites comments. The
+  reader must be able to stop after sentence two and still know exactly what to do.
+  **Voice:** for the **video**, write the whole caption as **Bluey speaking to the
+  viewer in the first person** — Bluey is the one who just did the thing on screen
+  and is telling you how to copy it; for an **image**, mention **Bluey** by
   name in the third person when the scene calls for it. Use the post's
   **searchable Dutch keywords
   naturally in the prose** (Instagram search reads the caption), then end with a

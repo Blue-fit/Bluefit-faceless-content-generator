@@ -23,7 +23,9 @@ def _brief(*urls: str) -> TrendBrief:
     return TrendBrief(
         week_start=WEEK,
         themes=[
-            TrendTheme(title=f"T{i}", summary="s", why_relevant="w", source_url=u)
+            TrendTheme(title=f"T{i}", summary="s", why_relevant="w", source_url=u,
+                       action="Loop 2 minuten", dose="na het eten",
+                       payoff="minder dip", evidence="e")
             for i, u in enumerate(urls)
         ],
     )
@@ -129,15 +131,22 @@ async def test_guards_report_zero_cost_when_they_do_not_re_prompt(
     gen_run: dict[str, Any],
 ) -> None:
     """A clean week must not be billed for a correction that never happened."""
-    from app.agents.schemas import GeneratorOutput, PostReferences, PostSpec
+    from app.agents.schemas import (
+        GeneratorOutput,
+        PostReferences,
+        PostSpec,
+        PostTakeaway,
+    )
 
     def _post(pillar: str, value: str, type_: str = "image") -> PostSpec:
         return PostSpec(
             pillar=pillar,  # type: ignore[arg-type]
             type=type_,  # type: ignore[arg-type]
             scene_prompt="The Blue Fit mascot in a park",
+            takeaway=PostTakeaway(action="Neem de trap", dose="1 keer per dag",
+                                  payoff="Je benen worden sterker"),
             caption_template="question",
-            caption="c",
+            caption="Neem vandaag de trap.",
             references_used=PostReferences(value=value),  # type: ignore[arg-type]
         )
 

@@ -6,6 +6,7 @@ from app.agents.schemas import (
     GeneratorOutput,
     PostReferences,
     PostSpec,
+    PostTakeaway,
     TrendBrief,
     TrendTheme,
 )
@@ -18,7 +19,9 @@ def test_schema_version_present() -> None:
 def test_trend_brief_valid() -> None:
     brief = TrendBrief(
         week_start="2026-06-15",  # type: ignore[arg-type]  # pydantic coerces
-        themes=[TrendTheme(title="t", summary="s", why_relevant="w", source_url="u")],
+        themes=[TrendTheme(title="t", summary="s", why_relevant="w", source_url="u",
+                   action="Loop 2 minuten na het eten", dose="2 minuten",
+                   payoff="minder middagdip", evidence="e")],
     )
     assert brief.themes[0].title == "t"
 
@@ -28,8 +31,13 @@ def _image_spec(**overrides: object) -> dict[str, object]:
         "pillar": "Community",
         "type": "image",
         "scene_prompt": "x",
+        "takeaway": PostTakeaway(
+            action="Loop twee minuten na het eten",
+            dose="2 minuten, binnen 30 minuten na elke maaltijd",
+            payoff="Je zakt 's middags minder weg",
+        ),
         "caption_template": "question",
-        "caption": "c",
+        "caption": "Loop twee minuten na het eten.",
         "references_used": PostReferences(value="Belonging"),
     }
     base.update(overrides)

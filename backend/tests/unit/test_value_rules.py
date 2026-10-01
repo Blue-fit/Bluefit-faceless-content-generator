@@ -1,7 +1,7 @@
 """Weekly anchor rule: 3 different Power-9 values x 3 different pillars, none used last week."""
 
 from app.agents.pipeline import _generator_message, _value_rule_violations
-from app.agents.schemas import GeneratorOutput, PostReferences, PostSpec
+from app.agents.schemas import GeneratorOutput, PostReferences, PostSpec, PostTakeaway
 
 
 def _post(pillar: str, value: str, type_: str = "image") -> PostSpec:
@@ -9,8 +9,10 @@ def _post(pillar: str, value: str, type_: str = "image") -> PostSpec:
         pillar=pillar,  # type: ignore[arg-type]
         type=type_,  # type: ignore[arg-type]
         scene_prompt="The Blue Fit mascot somewhere",
+        takeaway=PostTakeaway(action="Neem de trap", dose="1 keer per dag",
+                              payoff="Je benen worden sterker"),
         caption_template="question",
-        caption="c",
+        caption="Neem vandaag de trap in plaats van de lift.",
         references_used=PostReferences(value=value),  # type: ignore[arg-type]
     )
 
@@ -63,3 +65,14 @@ def test_forbidden_match_is_case_insensitive_for_legacy_values() -> None:
                 ("Natural Eating", "The 80% rule"))
     problems = _value_rule_violations(out, frozenset({"move naturally"}))  # legacy lowercase
     assert len(problems) == 1 and "Move naturally" in problems[0]
+
+
+def test_one_correction_reports_both_kinds_of_violation() -> None:
+    """Value rules and actionability share a retry — the message must carry both."""
+    from app.agents.pipeline import _post_action_violations
+
+    out = _week(("Community", "Belonging"), ("Keep Moving", "Belonging"),
+                ("Natural Eating", "The 80% rule"))
+    out.posts[0].takeaway.action = "Beweeg meer"
+    assert _value_rule_violations(out, frozenset())  # repeated value
+    assert _post_action_violations(out)              # and a vague action

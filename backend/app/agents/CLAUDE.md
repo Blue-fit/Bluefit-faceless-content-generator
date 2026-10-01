@@ -35,6 +35,16 @@ date, file changed, and reason.
 - The generator MUST declare `references_used` for each post — these
   become the `reasoning_blob`. Empty references means brand alignment
   is theater.
+- **A theme is a protocol, not a topic.** `TrendTheme` carries a required
+  `action`, `dose`, `payoff` and `evidence`; every `PostSpec` carries a
+  required `takeaway`. Without them the researcher returns explainers and
+  the captions tell the viewer why movement matters while handing them
+  nothing to do — see `docs/decisions/011`. Two pure gates enforce it:
+  `_theme_action_violations` (re-asks the researcher once inside
+  `_research`, then drops what won't mend) and `_post_action_violations`
+  (shares the single correction call with `_enforce_value_rules` rather
+  than buying a third generator retry). Both are fail-soft: a thin brief
+  still beats no posts.
 
 ## Tool dispatch boundary
 

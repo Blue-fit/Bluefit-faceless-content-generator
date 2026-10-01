@@ -52,7 +52,10 @@ _TOPICS: tuple[str, ...] = (
     "gezond eten volhouden",
 )
 # Question words put the mining where the audience's curiosity is.
-_PREFIXES: tuple[str, ...] = ("hoe", "waarom", "wat", "welke")
+# "hoeveel" and "hoe lang" pull back dose-shaped demand ("hoeveel minuten wandelen
+# na het eten"), which is what a theme needs to become a protocol rather than an
+# explainer. "waarom" stays: it is where the curiosity hooks come from.
+_PREFIXES: tuple[str, ...] = ("hoe", "hoeveel", "hoe lang", "waarom", "wat", "welke")
 
 _QUESTION_WORDS = ("hoe", "waarom", "wat", "welke", "wanneer", "hoeveel", "is", "moet")
 
@@ -64,6 +67,8 @@ _BLOCK: tuple[str, ...] = (
     "zwanger", "menopauze", "overgang", "adhd", "autisme", "burn out", "burnout",
     "depressie", "griep", "ziek", "kanker", "diabetes", "medicijn", "pillen",
     "operatie", "corona", "bevalling", "blessure",
+    # substances — "hoe lang slecht slapen na drugs" is real demand, wrong club
+    "drugs", "alcoholverslaving", "roken stoppen", "wiet",
     # other countries / pets — real demand, wrong audience
     "amerika", "china", "japan", "hond", "kat", "baby",
     # rival clubs: never build a post around a competitor's search term

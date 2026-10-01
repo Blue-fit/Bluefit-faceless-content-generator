@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import unicodedata
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -157,6 +158,96 @@ async def _resolve_sources(brief: TrendBrief) -> TrendBrief:
     )
 
 
+# Advice that cannot be counted, timed or ticked off. These phrases are the exact
+# failure mode: captions that explained why movement matters and left the viewer
+# with nothing to do. Matched as substrings against the lower-cased action.
+_VAGUE_ACTIONS: tuple[str, ...] = (
+    "beweeg meer", "meer bewegen", "eet gezond", "gezonder eten", "wees bewust",
+    "neem rust", "rust nemen", "luister naar je lichaam", "maak tijd voor jezelf",
+    "zorg goed voor jezelf", "vind balans", "geniet van het moment", "doe het rustig",
+    "move more", "eat better", "be mindful", "take it easy", "listen to your body",
+)
+# A dose is real when it carries an amount or an unmistakable moment to do it.
+_DOSE_TRIGGERS: tuple[str, ...] = (
+    "na het eten", "voor het eten", "na de maaltijd", "voor je koffie", "het opstaan",
+    "voor het slapen", "elke ochtend", "elke avond", "dagelijks", "per dag", "per week",
+    "s ochtends", "s avonds", "tijdens", "voordat", "nadat", "iedere", "elke",
+    "wakker word", "thuiskom", "het douchen",
+)
+
+
+def _fold(text: str) -> str:
+    """Lower-cased and stripped of accents: the model writes "vóór", we match "voor"."""
+    stripped = unicodedata.normalize("NFD", text.lower())
+    return "".join(c for c in stripped if unicodedata.category(c) != "Mn")
+
+
+# Blue Fit is a wellness club: it diagnoses nothing, treats nothing and promises no
+# change in anyone's risk. "Je bloedsuiker piekt minder" is a body doing something;
+# "vermindert het risico op gezondheidsproblemen" is a medical claim, and one got
+# past the prompt in testing. Organ words stay legal — it is the claim that isn't.
+_CLINICAL_CLAIMS: tuple[str, ...] = (
+    "risico op", "kans op overlijden", "sterfte", "levensverwachting",
+    "voorkomt ziekte", "behandelt", "geneest", "genezing", "diagnose",
+    "diabetes", "kanker", "depressie", "hart- en vaatziekten", "hoge bloeddruk",
+    "aandoening", "gezondheidsproblemen", "medisch",
+)
+
+
+def _clinical_claims(text: str) -> list[str]:
+    """Which medical claims a line makes (empty = safe to publish)."""
+    folded = _fold(text)
+    return [c for c in _CLINICAL_CLAIMS if c in folded]
+
+
+def _is_vague_action(action: str) -> bool:
+    text = _fold(action.strip())
+    return not text or any(v in text for v in _VAGUE_ACTIONS)
+
+
+def _has_dose(dose: str) -> bool:
+    """A number, or a moment the viewer cannot mistake. Anything else is a mood."""
+    text = _fold(dose.strip())
+    return any(c.isdigit() for c in text) or any(t in text for t in _DOSE_TRIGGERS)
+
+
+def _theme_action_violations(brief: TrendBrief) -> list[str]:
+    """Why a theme is still an explainer (empty list = OK). Pure, unit-testable."""
+    problems: list[str] = []
+    for theme in brief.themes:
+        if _is_vague_action(theme.action):
+            problems.append(f"{theme.title!r}: action is not something you can do ({theme.action!r})")
+        if not _has_dose(theme.dose):
+            problems.append(f"{theme.title!r}: dose has no amount or moment ({theme.dose!r})")
+        claims = _clinical_claims(f"{theme.payoff} {theme.evidence}")
+        if claims:
+            problems.append(f"{theme.title!r}: medical claim, not allowed ({claims})")
+    return problems
+
+
+def _post_action_violations(out: GeneratorOutput) -> list[str]:
+    """Posts whose takeaway is vague, or whose caption never states the action."""
+    problems: list[str] = []
+    for post in out.posts:
+        t = post.takeaway
+        if _is_vague_action(t.action):
+            problems.append(f"{post.pillar}: takeaway action is vague ({t.action!r})")
+        if not _has_dose(t.dose):
+            problems.append(f"{post.pillar}: takeaway dose has no amount or moment ({t.dose!r})")
+        # The caption is where the viewer actually reads it. A takeaway the caption
+        # never mentions is bookkeeping, not value. Short words ("de", "na") match
+        # anything, so only content words count — and an action built entirely from
+        # short ones can't be checked this way, so it isn't flagged.
+        head = " ".join(post.caption.split()[:60]).lower()
+        content_words = [w.strip(".,:;!?") for w in t.action.lower().split() if len(w) >= 4]
+        if content_words and not any(w in head for w in content_words):
+            problems.append(f"{post.pillar}: caption does not state the action early")
+        claims = _clinical_claims(f"{t.payoff} {post.caption}")
+        if claims:
+            problems.append(f"{post.pillar}: caption makes a medical claim ({claims})")
+    return problems
+
+
 async def _safe_demand() -> SearchDemandResult:
     """Mine search demand, degrading to nothing if the endpoint misbehaves.
 
@@ -169,6 +260,51 @@ async def _safe_demand() -> SearchDemandResult:
     except Exception as exc:  # noqa: BLE001 — never fatal
         logger.warning("pipeline.search_demand_failed", error=str(exc)[:160])
         return SearchDemandResult(queries=[])
+
+
+async def _enforce_actionable_themes(
+    brief: TrendBrief, base_message: str, week_start: date
+) -> tuple[TrendBrief, int, int]:
+    """Re-ask once for themes that are still explainers, then drop what won't mend.
+
+    Returns the brief plus the retry's token counts, so `_research` keeps metering
+    the whole step from real usage. Best-effort: a thin brief never blocks a week,
+    the same way a malformed one doesn't.
+    """
+    problems = _theme_action_violations(brief)
+    if not problems:
+        return brief, 0, 0
+    logger.info("research.theme_not_actionable", problems=problems[:6])
+    retry = await _run_agent(
+        build_researcher(),
+        f"{base_message}\n\n## CORRECTION\nSome themes are still explainers, not "
+        f"protocols: {'; '.join(problems)}. Rewrite every theme so its \"action\" is "
+        "one thing a member can DO today without buying anything, and its \"dose\" "
+        "carries a number or an unmistakable moment. Drop any theme you cannot make "
+        "concrete rather than padding it with vague advice. Return ONLY the JSON "
+        "object from your instructions — no prose, no markdown fences.",
+        f"wk-{week_start}-r3",
+    )
+    retried = _parse_brief(retry.text, week_start)
+    if retried is None:
+        logger.warning("research.action_retry_failed")
+        return brief, retry.input_tokens, retry.output_tokens
+
+    best = retried if len(_theme_action_violations(retried)) < len(problems) else brief
+    kept = [
+        t for t in best.themes if not _is_vague_action(t.action) and _has_dose(t.dose)
+    ]
+    if not kept:
+        # Nothing survived. A loose brief still beats no posts this week.
+        logger.warning("research.no_actionable_themes", themes=len(best.themes))
+        return best, retry.input_tokens, retry.output_tokens
+    if len(kept) < len(best.themes):
+        logger.info("research.themes_dropped", kept=len(kept), total=len(best.themes))
+    return (
+        best.model_copy(update={"themes": kept}),
+        retry.input_tokens,
+        retry.output_tokens,
+    )
 
 
 @meter("research")
@@ -199,7 +335,8 @@ async def _research(req: _ResearchRequest) -> _ResearchResult:
             f"{message}\n\n## CORRECTION\nYour previous reply was not valid "
             "JSON in the required shape. Return ONLY the JSON object described in your "
             'instructions — keys "themes" -> a list of {title, summary, why_relevant, '
-            'source_url} — with no prose and no markdown fences.',
+            'action, dose, payoff, evidence, source_url} — with no prose and no '
+            "markdown fences.",
             f"wk-{req.week_start}-r2",
         )
         in_tokens += repair.input_tokens
@@ -211,6 +348,11 @@ async def _research(req: _ResearchRequest) -> _ResearchResult:
             logger.warning("research.brief_unvalidated", raw=run.text[:200])
 
     if brief is not None:
+        brief, extra_in, extra_out = await _enforce_actionable_themes(
+            brief, message, req.week_start
+        )
+        in_tokens += extra_in
+        out_tokens += extra_out
         brief = await _resolve_sources(brief)
     return _ResearchResult(
         model=MODEL_FLASH,
@@ -357,6 +499,29 @@ def _recent_block(recent: list[RecentPost]) -> str:
     return "\n".join(lines)
 
 
+def _themes_block(brief: TrendBrief | None, raw: str) -> str:
+    """The week's themes with their protocol spelled out.
+
+    Dumping the researcher's raw JSON let the generator skim past the action; the
+    labels make it the loudest thing in the message.
+    """
+    if brief is None or not brief.themes:
+        return _strip(raw)
+    blocks = []
+    for t in brief.themes:
+        blocks.append(
+            f"### {t.title}\n"
+            f"{t.summary}\n"
+            f"- ACTION: {t.action}\n"
+            f"- DOSE: {t.dose}\n"
+            f"- PAYOFF: {t.payoff}\n"
+            f"- WHY IT WORKS: {t.evidence}\n"
+            f"- FITS: {t.why_relevant}\n"
+            f"- SOURCE: {t.source_url}"
+        )
+    return "\n\n".join(blocks)
+
+
 def _generator_message(
     themes: str,
     brand_chunks: list[str],
@@ -461,20 +626,36 @@ def _value_rule_violations(out: GeneratorOutput, forbidden: frozenset[str]) -> l
 async def _enforce_value_rules(
     out: GeneratorOutput, forbidden: frozenset[str], base_message: str, week_start: date
 ) -> tuple[GeneratorOutput, Decimal]:
-    """Re-prompt once if the week breaks the value/pillar anchor rule.
+    """Re-prompt once if the week breaks the anchor rule or hands the viewer nothing.
 
-    Runs before any rendering, so no asset spend is wasted. Best-effort: if the
-    correction still violates the rule we keep whichever attempt is closer and log
-    it — variety never blocks a weekly run.
+    Both checks share one correction call: a second paid retry buys little when the
+    generator is rewriting all 3 posts either way. Runs before any rendering, so no
+    asset spend is wasted. Best-effort: if the correction still violates a rule we
+    keep whichever attempt is closer and log it — neither rule blocks a weekly run.
     """
-    problems = _value_rule_violations(out, forbidden)
+    value_problems = _value_rule_violations(out, forbidden)
+    action_problems = _post_action_violations(out)
+    problems = value_problems + action_problems
     if not problems:
         return out, Decimal(0)
-    logger.info("pipeline.value_rule_violation", problems=problems)
+    logger.info(
+        "pipeline.post_rule_violation", values=value_problems, actions=action_problems
+    )
+    fixes = []
+    if value_problems:
+        fixes.append(
+            "use 3 DIFFERENT Power-9 values and 3 DIFFERENT pillars, and NONE of the "
+            "forbidden values"
+        )
+    if action_problems:
+        fixes.append(
+            "give every post a `takeaway` the viewer can actually do — a concrete "
+            "action with a dose that carries a number or an unmistakable moment — and "
+            "state that action in the caption's first two sentences"
+        )
     correction = (
-        f"{base_message}\n\n## CORRECTION\nYour 3 posts break the weekly anchor rule: "
-        f"{'; '.join(problems)}. Regenerate all 3 posts so they use 3 DIFFERENT Power-9 "
-        "values and 3 DIFFERENT pillars, and use NONE of the forbidden values."
+        f"{base_message}\n\n## CORRECTION\nYour 3 posts break the rules: "
+        f"{'; '.join(problems)}. Regenerate all 3 posts so they {' and '.join(fixes)}."
     )
     gen = await _generate(
         _GenerateRequest(trigger="cron", message=correction, session_id=f"wk-{week_start}-v2")
@@ -484,9 +665,9 @@ async def _enforce_value_rules(
     except Exception:  # noqa: BLE001 — rule retry is best-effort, never fatal
         logger.warning("pipeline.value_rule_retry_failed", problems=problems)
         return out, gen.cost_eur
-    remaining = _value_rule_violations(retried, forbidden)
+    remaining = _value_rule_violations(retried, forbidden) + _post_action_violations(retried)
     if remaining:
-        logger.warning("pipeline.value_rule_unresolved", problems=remaining)
+        logger.warning("pipeline.post_rule_unresolved", problems=remaining)
     best = retried if len(remaining) <= len(problems) else out
     return best, gen.cost_eur
 
@@ -515,6 +696,10 @@ def _reasoning_blob(
         # or the generator named a theme the researcher didn't return).
         "theme_source_url": (theme_sources or {}).get(r.theme or ""),
         "value": r.value,
+        # What the viewer can actually do after seeing this post, and at what dose.
+        "action": spec.takeaway.action,
+        "dose": spec.takeaway.dose,
+        "payoff": spec.takeaway.payoff,
         "hook": spec.hook,
         "beat": spec.beat,
         "scene_prompt": spec.scene_prompt,
@@ -535,8 +720,8 @@ def _reasoning_blob(
 def _reason_text(spec: PostSpec) -> str:
     r = spec.references_used
     return (
-        f"{spec.pillar} | {r.theme} | {r.value} | {spec.hook} | {spec.beat} | "
-        f"{spec.scene_prompt} | {spec.caption}"
+        f"{spec.pillar} | {r.theme} | {r.value} | {spec.takeaway.action} | "
+        f"{spec.hook} | {spec.beat} | {spec.scene_prompt} | {spec.caption}"
     )
 
 
@@ -644,7 +829,7 @@ async def run_weekly(week_start: date, *, uploader: AssetUploader) -> WeekResult
             trigger="cron", week_start=week_start, demand=demand.as_lines()
         )
     )
-    themes = _strip(research.raw)
+    themes = _themes_block(research.brief, research.raw)
     theme_sources = (
         {t.title: t.source_url for t in research.brief.themes} if research.brief else {}
     )
