@@ -137,3 +137,40 @@ async def test_video_never_polls_and_asks_for_the_clip_inline(
     assert "background" not in call  # background+get was the broken path
     assert call["response_format"]["delivery"] == "inline"
     assert call["timeout"] == generate_video._TIMEOUT_SECONDS
+
+
+@pytest.mark.asyncio
+async def test_video_rerolls_a_content_filter_block(interactions: _FakeInteractions) -> None:
+    """Omni's 400 prohibited_content passes on a re-roll (decisions/012)."""
+    real_create = interactions.create
+    blocks = {"left": 2}
+
+    async def flaky_create(**kwargs: Any) -> Any:
+        if blocks["left"]:
+            blocks["left"] -= 1
+            interactions.calls.append(kwargs)
+            raise RuntimeError("Error code: 400 - {'error': {'code': 'prohibited_content'}}")
+        return await real_create(**kwargs)
+
+    interactions.create = flaky_create  # type: ignore[method-assign]
+    result = await generate_video.render_video("motion", first_frame=_REF)
+    assert result.video_bytes == b"mp4" and len(interactions.calls) == 3
+
+
+@pytest.mark.asyncio
+async def test_video_gives_up_after_repeated_blocks_and_never_rerolls_other_errors(
+    interactions: _FakeInteractions,
+) -> None:
+    async def always_blocked(**kwargs: Any) -> Any:
+        raise RuntimeError("Error code: 400 - prohibited_content")
+
+    interactions.create = always_blocked  # type: ignore[method-assign]
+    with pytest.raises(ToolError, match="prohibited content"):
+        await generate_video.render_video("motion", first_frame=_REF)
+
+    async def bad_request(**kwargs: Any) -> Any:
+        raise RuntimeError("Error code: 400 - invalid aspect ratio")
+
+    interactions.create = bad_request  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="invalid aspect ratio"):
+        await generate_video.render_video("motion", first_frame=_REF)

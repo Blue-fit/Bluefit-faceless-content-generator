@@ -7,7 +7,7 @@ DOWN = "\U0001F447"
 
 def test_split_hook_and_strip_pointers() -> None:
     assert split_hook(f"Kop hier\nLees verder {DOWN}") == ("Kop hier", "Lees verder")
-    assert split_hook("Kop hier") == ("Kop hier", "Lees de caption")
+    assert split_hook("Kop hier") == ("Kop hier", "")  # one-line hooks carry no CTA
     assert strip_pointers(f"Antwoord ↓{DOWN}️") == "Antwoord"
 
 

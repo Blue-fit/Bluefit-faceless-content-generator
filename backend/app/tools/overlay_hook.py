@@ -256,6 +256,12 @@ def render_designed(media: Image.Image, hook: str, scale: float = 1.0) -> Image.
     glow_color = (0, 0, 0, 150) if dark else (255, 255, 255, 190)
 
     headline, cta = split_hook(hook)
+    # A one-line hook (decisions/012) sits on a white card, like the image typography,
+    # so it reads the same on light and dark frames for the whole clip. A pre-pivot
+    # hook with a CTA keeps the glow design.
+    card = not cta
+    if card:
+        color, pill_fill = blue, (*_PILL, 255)
     key = pick_highlight(headline)
     lines = _wrap(headline, _HEADLINE_MAX_CHARS).split("\n")
     size = max(16, int((h // 26) * scale))
@@ -284,14 +290,25 @@ def render_designed(media: Image.Image, hook: str, scale: float = 1.0) -> Image.
 
     layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
 
+    if card:
+        lefts = [x for _, x, _, _ in layout]
+        rights = [x + head_font.getlength(wd) for wd, x, _, _ in layout]
+        pad_x, pad_y = size * 0.7, size * 0.45
+        ImageDraw.Draw(layer).rounded_rectangle(
+            (min(lefts) - pad_x, layout[0][2] - pad_y, max(rights) + pad_x, y + pad_y * 0.6),
+            radius=size * 0.5, fill=(255, 255, 255, 240),
+        )
+
     # ---- pass 1: glow (text drawn in the glow colour, blurred) for legibility
     glow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
     for wd, x, yy, _ in layout:
         gd.text((x, yy), wd, font=head_font, fill=glow_color)
-    gd.text((cta_x, cta_y), cta, font=cta_font, fill=glow_color)
+    if cta:
+        gd.text((cta_x, cta_y), cta, font=cta_font, fill=glow_color)
     glow = glow.filter(ImageFilter.GaussianBlur(radius=max(2, size * 0.16)))
-    layer.alpha_composite(glow)
+    if not card:  # the card already gives the contrast
+        layer.alpha_composite(glow)
 
     # ---- pass 2: the highlight pill behind the key word
     draw = ImageDraw.Draw(layer)
@@ -304,11 +321,12 @@ def render_designed(media: Image.Image, hook: str, scale: float = 1.0) -> Image.
                 radius=size * 0.55, fill=pill_fill,
             )
 
-    # ---- pass 3: headline, CTA, arrow
+    # ---- pass 3: headline, then the CTA and arrow when the hook has one
     for wd, x, yy, _ in layout:
         draw.text((x, yy), wd, font=head_font, fill=color)
-    draw.text((cta_x, cta_y), cta, font=cta_font, fill=color)
-    _draw_arrow(draw, (cta_x + cta_w + size * 0.4, cta_y + size * 0.5), size, color)
+    if cta:  # pre-pivot hooks only; new hooks are a headline alone (decisions/012)
+        draw.text((cta_x, cta_y), cta, font=cta_font, fill=color)
+        _draw_arrow(draw, (cta_x + cta_w + size * 0.4, cta_y + size * 0.5), size, color)
     return layer
 
 

@@ -6,8 +6,8 @@ duplication, the brand visual core is one shared base (`style_block.md`) and eac
 format adds a short tail:
 
 - image with a hook  -> `style_block_image.md` + `style_block_typography.md`: the
-  image model renders the headline / highlighted keyword / handwritten CTA and a
-  hand-drawn arrow in-picture (decisions/010).
+  image model renders the headline card with its highlighted keyword in-picture
+  (decisions/010, 012); a pre-pivot hook also gets its handwritten CTA and arrow.
 - image without hook -> `style_block_image.md` + `style_block_clean_top.md`: a
   video's opening frame stays text-free; the hook is overlaid after Omni.
 - video              -> `style_block_video.md`.
@@ -32,9 +32,19 @@ __all__ = ["build_image_prompt", "build_video_prompt", "split_hook", "typography
 
 
 def typography_block(hook: str) -> str:
-    """The in-picture typography spec for `hook` (headline + CTA)."""
+    """The in-picture typography spec for `hook`.
+
+    New posts carry a headline only (decisions/012). A pre-pivot hook keeps its caption
+    CTA when edited, so that line is appended only when the hook has one.
+    """
     headline, cta = split_hook(hook)
-    return _STYLE_TYPOGRAPHY.replace("{hook_line}", headline).replace("{cta}", cta)
+    block = _STYLE_TYPOGRAPHY.replace("{hook_line}", headline)
+    if cta:
+        block += (
+            f'\nDirectly below the card, smaller, in a casual handwritten script: "{cta}", '
+            "followed by a hand-drawn curved arrow pointing down."
+        )
+    return block
 
 
 def build_image_prompt(scene_prompt: str, hook: str | None = None) -> str:

@@ -1,16 +1,17 @@
 """The on-screen hook's text format, shared by prompts and rendering.
 
-A hook is two parts in one string: the headline, a newline, then the caption
-call-to-action (the generator ends it with a pointer such as 👇). Images render it
-in-picture via the image model; videos overlay it — both need the same split and
-the same "which word gets the highlight" choice, so it lives here, dependency-free.
+Since the relatable pivot (decisions/012) a hook is ONE line: the on-screen punchline,
+complete without the caption. Posts made before that carry a second line, the caption
+call-to-action (ending in a pointer such as 👇); those still split and render the
+same way, so editing an old post keeps its CTA. Images render the hook in-picture via
+the image model; videos overlay it. Both need the same split and the same "which word
+gets the highlight" choice, so it lives here, dependency-free.
 """
 
 from __future__ import annotations
 
 import re
 
-DEFAULT_CTA = "Lees de caption"
 # Pointer glyphs used at the end of the CTA (emoji / arrows / variation selector).
 _POINTERS = re.compile(r"[↓⬇\U0001F447️]")
 _STOP = {
@@ -28,14 +29,14 @@ def split_hook(hook: str) -> tuple[str, str]:
     """`'hook line\\nLees de caption 👇'` -> `('hook line', 'Lees de caption')`.
 
     The first line is the headline; the rest is the CTA with any pointer stripped.
-    A single-line hook gets the default CTA — every post must point at its caption.
+    A single-line hook (every post since decisions/012) has no CTA: `('hook line', '')`.
     """
     lines = [ln.strip() for ln in hook.split("\n") if ln.strip()]
     if not lines:
-        return hook.strip(), DEFAULT_CTA
+        return strip_pointers(hook), ""
     headline = strip_pointers(lines[0])
     cta = strip_pointers(" ".join(lines[1:])) if len(lines) > 1 else ""
-    return headline, cta or DEFAULT_CTA
+    return headline, cta
 
 
 def pick_highlight(headline: str) -> str | None:

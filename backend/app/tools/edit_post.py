@@ -358,9 +358,10 @@ made.
   as the post. Use target "asset". Leave "new_scene_prompt" null to keep the exact
   video/image and only swap the on-screen words (mode "tweak"); ALSO set
   "new_scene_prompt" if they want a new video/image too (it is regenerated with the
-  new hook). The on-screen text is two lines: the hook line, then a caption
-  call-to-action line ending in 👇 (e.g. "Lees de caption 👇"). When the user
-  changes only the hook words, KEEP the existing call-to-action line as the last line
+  new hook). The on-screen text is ONE relatable line (≤8 words) that works on its
+  own, with no call-to-action: write it the same way. Only an older post has a second
+  line, a caption call-to-action ending in 👇 (e.g. "Lees de caption 👇"); when the
+  user changes only the hook words of such a post, KEEP that line as the last line
   (separated by a newline) unless they explicitly remove it. Otherwise "new_hook" is
   null.
 - If the request is only to resize the on-image HOOK TEXT (e.g. "make the text

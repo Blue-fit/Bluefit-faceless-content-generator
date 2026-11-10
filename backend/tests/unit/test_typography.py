@@ -25,7 +25,7 @@ _REFS = (RefImage(data=b"ref", mime_type="image/jpeg"),)
 
 def test_split_hook_separates_headline_and_cta_and_strips_pointers() -> None:
     assert split_hook(HOOK) == ("Is natuurlijk eten de 80% regel?", "Lees de caption")
-    assert split_hook("Alleen een kop") == ("Alleen een kop", "Lees de caption")  # default CTA
+    assert split_hook("Alleen een kop") == ("Alleen een kop", "")  # no CTA since 012
     assert split_hook("Kop\nAntwoord ↓") == ("Kop", "Antwoord")
 
 
@@ -35,6 +35,14 @@ def test_image_prompt_with_hook_renders_typography_and_no_clean_top_rule() -> No
     assert '"Lees de caption"' in prompt and "hand-drawn curved arrow" in prompt
     assert DOWN not in prompt  # the model draws its own arrow
     assert "No on-image text" not in prompt
+
+
+def test_one_line_hook_renders_a_headline_card_and_no_cta() -> None:
+    """Relatable posts (decisions/012): the line stands alone, nothing points at the caption."""
+    prompt = build_image_prompt("Bluey at a supermarket checkout.", hook="Vanaf maandag eet ik gezond")
+    assert '"Vanaf maandag eet ik gezond"' in prompt and "highlight pill" in prompt
+    assert "handwritten" not in prompt and "arrow" not in prompt
+    assert render.text_matches("Vanaf maandag eet ik gezond", "VANAF MAANDAG\nEET IK GEZOND")
 
 
 def test_image_prompt_without_hook_keeps_the_top_clean() -> None:

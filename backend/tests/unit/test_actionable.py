@@ -154,6 +154,7 @@ def test_a_moment_the_live_run_wrongly_rejected_now_passes() -> None:
     assert _has_dose("Direct na het opstaan")
     assert _has_dose("vóór je koffie")
     assert _has_dose("zodra je thuiskomt")
+    assert _has_dose("één extra handvol, bij je lunch of avondeten")  # a meal is a moment
 
 
 # ---- client copy ---------------------------------------------------------------

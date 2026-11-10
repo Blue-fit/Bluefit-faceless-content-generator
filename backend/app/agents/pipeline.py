@@ -219,6 +219,8 @@ _DOSE_TRIGGERS: tuple[str, ...] = (
     "wakker word", "thuiskom", "het douchen",
     # "Elk half uur" was rejected in testing: a dose can say its amount in words.
     "elk ", "ieder ", "half uur", "kwartier", "kwartiertje",
+    # "één extra handvol, bij je lunch of avondeten" was rejected: a meal is a moment.
+    "ontbijt", "lunch", "avondeten", "diner",
 )
 
 
@@ -272,7 +274,12 @@ def _theme_action_violations(brief: TrendBrief) -> list[str]:
 
 
 def _post_action_violations(out: GeneratorOutput) -> list[str]:
-    """Posts whose takeaway is vague, or whose caption never states the action."""
+    """Posts whose takeaway is vague, or whose caption never states the action.
+
+    Since decisions/012 the post leads with a relatable moment and the tip comes
+    second, but it still comes: the caption is short (2-4 sentences), so "early" now
+    means anywhere in its first 60 words, which is effectively the whole caption.
+    """
     problems: list[str] = []
     for post in out.posts:
         t = post.takeaway
@@ -287,7 +294,7 @@ def _post_action_violations(out: GeneratorOutput) -> list[str]:
         head = " ".join(post.caption.split()[:60]).lower()
         content_words = [w.strip(".,:;!?") for w in t.action.lower().split() if len(w) >= 4]
         if content_words and not any(w in head for w in content_words):
-            problems.append(f"{post.pillar}: caption does not state the action early")
+            problems.append(f"{post.pillar}: caption does not state the action")
         claims = _clinical_claims(f"{t.payoff} {post.caption}")
         if claims:
             problems.append(f"{post.pillar}: caption makes a medical claim ({claims})")
@@ -697,7 +704,8 @@ async def _enforce_value_rules(
         fixes.append(
             "give every post a `takeaway` the viewer can actually do — a concrete "
             "action with a dose that carries a number or an unmistakable moment — and "
-            "state that action in the caption's first two sentences"
+            "state that action in the caption as the tip, right after the line that "
+            "owns the relatable moment"
         )
     correction = (
         f"{base_message}\n\n## CORRECTION\nYour 3 posts break the rules: "

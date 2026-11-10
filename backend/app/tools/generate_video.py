@@ -33,6 +33,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import httpx
+import structlog
 
 from app.genai_client import MODEL_VIDEO, get_genai_client, with_retry
 from app.meter import MeteredResult, MeterRequest, meter, pricing
@@ -43,6 +44,17 @@ _DEFAULT_DURATION = 8
 # so give it room while still failing clearly rather than hanging forever.
 _TIMEOUT_SECONDS = 360.0
 _MAX_REFERENCE_IMAGES = 3
+# Omni's content filter rejects some 3D-mascot clips with a 400 "prohibited_content"
+# that passes on a plain re-roll (measured 2026-11-09, decisions/012), the same way
+# the image filter does (decisions/008). A rejected request returns no clip.
+_BLOCK_ATTEMPTS = 3
+
+logger = structlog.get_logger(__name__)
+
+
+def _is_blocked(exc: Exception) -> bool:
+    """True for Omni's content-filter rejection (a 400 whose body says prohibited_content)."""
+    return "prohibited_content" in str(exc)
 
 
 class VideoRequest(MeterRequest):
@@ -95,21 +107,33 @@ async def render_video(
     inputs.extend(_image_input(img) for img in images)
 
     client = get_genai_client()
-    interaction: Any = await with_retry(
-        lambda: client.aio.interactions.create(
-            model=MODEL_VIDEO,
-            input=inputs,
-            response_modalities=["video"],
-            response_format={
-                "type": "video",
-                "aspect_ratio": aspect_ratio,
-                "duration": f"{duration_seconds}s",
-                "delivery": "inline",
-            },
-            generation_config={"video_config": {"task": task}},
-            timeout=_TIMEOUT_SECONDS,
-        )
-    )
+    interaction: Any = None
+    for attempt in range(1, _BLOCK_ATTEMPTS + 1):
+        try:
+            interaction = await with_retry(
+                lambda: client.aio.interactions.create(
+                    model=MODEL_VIDEO,
+                    input=inputs,
+                    response_modalities=["video"],
+                    response_format={
+                        "type": "video",
+                        "aspect_ratio": aspect_ratio,
+                        "duration": f"{duration_seconds}s",
+                        "delivery": "inline",
+                    },
+                    generation_config={"video_config": {"task": task}},
+                    timeout=_TIMEOUT_SECONDS,
+                )
+            )
+            break
+        except Exception as exc:  # noqa: BLE001 — re-raised unless a filter block to re-roll
+            if not _is_blocked(exc):
+                raise
+            logger.warning("genai.video_blocked", attempt=attempt)
+            if attempt == _BLOCK_ATTEMPTS:
+                raise ToolError(
+                    f"Omni blocked the clip as prohibited content {_BLOCK_ATTEMPTS} times."
+                ) from exc
     if interaction.status != "completed":
         raise ToolError(f"Omni video {interaction.status}: {interaction.errors}")
     video = interaction.output_video

@@ -6,7 +6,7 @@ asset:
 
 - image: Gemini 3 Pro Image, prompt + the mascot reference photos. When a `hook`
   is given the model renders it in-picture as designed typography (headline,
-  highlighted keyword, handwritten CTA, hand-drawn arrow — decisions/010), and a
+  highlighted keyword — decisions/010, 012), and a
   Flash read-back verifies the words are spelled exactly; a mismatch re-rolls.
 - video: a text-free still first (clean top), then Omni image-to-video from that
   still. The still pins the mascot's likeness; the hook is overlaid afterwards.
@@ -58,7 +58,7 @@ def _norm(text: str) -> str:
 
 
 def text_matches(hook: str, transcript: str) -> bool:
-    """True when the headline and CTA of `hook` both appear verbatim in `transcript`."""
+    """True when the headline (and the CTA, if the hook has one) appear verbatim in `transcript`."""
     headline, cta = split_hook(hook)
     seen = _norm(transcript)
     return _norm(headline) in seen and _norm(cta) in seen

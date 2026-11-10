@@ -87,3 +87,22 @@ def test_is_dark_top_threshold() -> None:
     img = Image.new("RGB", (100, 100), (10, 10, 10))
     img.paste((240, 240, 240), (0, 0, 100, 30))
     assert not overlay_hook.is_dark_top(img)
+
+
+def test_one_line_hook_draws_no_cta_below_the_headline() -> None:
+    """A relatable hook (decisions/012) is the headline alone: the block ends sooner."""
+    light = Image.new("RGB", (720, 1280), (240, 240, 240))
+    alone = overlay_hook.render_designed(light, "De dag na legday").getbbox()
+    legacy = overlay_hook.render_designed(light, f"De dag na legday\nLees de caption {DOWN}").getbbox()
+    assert alone is not None and legacy is not None
+    assert alone[3] < legacy[3]
+
+
+def test_one_line_hook_sits_on_a_white_card_with_blue_text_even_on_a_dark_frame() -> None:
+    """decisions/012: same card as the image typography, legible on any frame."""
+    dark = Image.new("RGB", (360, 640), (20, 30, 45))
+    layer = overlay_hook.render_designed(dark, "Zo zit jij nu ook")
+    px = list(layer.crop((0, 0, 360, 200)).convert("RGBA").getdata())
+    white = [p for p in px if p[3] > 200 and min(p[:3]) > 245]
+    blue = [p for p in px if p[3] > 200 and p[2] > 150 and p[0] < 80]
+    assert len(white) > 2000 and len(blue) > 100

@@ -1,40 +1,39 @@
 # Engagement template: Observation
 
-Use when you want quiet agreement, saves, and shares — best for lifestyle, calm,
-and "this is just how it feels" moments.
+Use when the moment is about a type of person — the reader thinks *"dit is zó
+[naam]"* and sends it. Best for shares and saves.
 
 ## Shape
-- 3–5 short sentences. Open with the hook as a relatable observation.
-- **By sentence two: the action, with its dose** — offered as something you do,
-  not barked as an instruction ("Twee minuten lopen na het eten, meer is het
-  niet"). Then the payoff.
-- Close on a resonant, settling line (not a question) the reader nods along to.
+- 2–4 short sentences, Dutch, under 450 characters.
+- **Sentence one owns the moment** as a dry, recognisable observation: *"De trap na
+  legday is geen trap. Het is een berg."* Never explain the joke.
+- **Then the tip, with its dose**, offered the way you'd mention it to a friend
+  ("Twee minuten lopen na het eten, meer is het niet"), never barked as a command.
+- **Then one line on why it works**, the line that earns the save: a counter-intuitive
+  fact, a reframe, or a comparison that makes the size of it real. Never the textbook
+  fact everyone already knows.
+- **Close with a share prompt** aimed at a specific person: *"Stuur dit naar je
+  sportmaatje die vanochtend precies zo liep."*, *"Tag degene die altijd 'vanaf
+  maandag' zegt."*
 
 ## Do
-- Notice something real and small — morning light, the first steps after lunch,
-  the calm of a simple meal.
-- Let it breathe: short lines, much feeling in few words (the brand tone).
-- **The "why it works" line must earn its place.** Not the fact everyone already
-  has ("blauw licht blokkeert melatonine"). Make it a counter-intuitive fact, a
-  reframe of something familiar, or a comparison that makes the size of it real.
-- **Tie the action to its pillar or Power-9 value**, in our own words, woven into a
-  sentence — samen / de mensen om je heen (Community), natuurlijk bewegen
-  (Keep Moving), kleine doelen en consistentie (Keep Setting Goals), echt eten en
-  de 80%-regel (Natural Eating). Never a slogan, never a label.
-- **Name the action and its dose by sentence two.** "Loop twee minuten na het
-  eten", niet "beweeg wat vaker". If the reader stops after sentence two they must
-  still know exactly what to do. At most one sentence of build-up before it.
+- Notice something real and small that everyone has felt and nobody says out loud.
+- Short lines, dry wit, much feeling in few words.
+- **Tie the tip to its pillar or Power-9 value** with a light touch, in our own words
+  — samen / de mensen om je heen (Community), natuurlijk bewegen (Keep Moving), kleine
+  doelen (Keep Setting Goals), echt eten en de 80%-regel (Natural Eating). Never a
+  slogan, never a label; one word is enough if more would feel forced.
 - The mascot is called **Bluey**. Check `type` in "This post": for a **video**,
   write the caption in **Bluey's own voice — first person, speaking directly to the
-  viewer** — Bluey just did the thing on screen and is telling you how to copy it;
-  for an **image**, mention Bluey by name in the third person.
+  viewer**; for an **image**, mention Bluey by name in the third person.
 
 ## Don't
-- Don't lecture or sell. The action is still there, but offered the way you'd
-  mention it to someone at the table — never "jij moet", never a command.
-- No hype or perfection talk.
+- Don't lecture or sell, never "jij moet".
+- Never make the person you tag the butt of a mean joke: it's affectionate, the
+  reader is in on it too.
+- No hype, no perfection talk, no "lees de caption".
 
 ## Example (Blue Fit voice)
-De eerste stappen na het eten voelen anders dan die van 's ochtends. Twee
-minuten, binnen een half uur na je bord — meer is het niet. Je middag zakt
-minder ver weg, en je merkt het dezelfde dag nog. Klein, en toch het verschil.
+De dag na legday is elke trap een persoonlijke vijand, ook voor Bluey. Toch helpt
+juist rustig bewegen: tien minuten wandelen en de stijfheid zakt sneller dan op de
+bank. Stuur dit naar degene die vandaag de lift nam.

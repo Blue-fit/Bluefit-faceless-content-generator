@@ -1,5 +1,42 @@
 # Prompts changelog
 
+## 2026-11-10 - relatable AND a lesson: three researched formats (decisions/012)
+- `agents/prompts/generator.md` - every post is relatable ("dit ben ik") and teaches one
+  thing ("o, zo dus"), with the lesson visible in the post. Each post uses one of three
+  formats from an ig-viral research pass over 297 Shorts: [Fout vs goed], [De echte
+  vraag], [Dit vs dat]; 3 different formats a week, named at the start of `beat`. The
+  video is Fout vs goed or Dit vs dat, opening on one single moment (a test still came
+  back as two panels), with Bluey in frame to the end (a test clip's payoff happened
+  off screen). Vague teasers and generic advice titles are banned: they ran 0.09x-0.2x.
+- `agents/prompts/style_block.md` - one Bluey per panel in two-panel images.
+- `agents/prompts/caption_*.md` - the "why it works" line is standard, not optional.
+- `tools/overlay_hook.py` - one-line hooks sit on a white card with blue text, like the
+  image typography.
+
+## 2026-11-09 - relatable 3D Bluey: shareable first, tip second (decisions/012)
+- `agents/prompts/style_block.md` - Bluey is a stylised 3D animated character with an
+  expressive face, designed from the reference photos but never rendered as the
+  costume. Faces of people are hidden even in the background; scenes stay tidy and
+  warm (a probe render went grim); Bluey stays light ocean blue at night (a test render
+  went navy). No kids/toy/nursery words, not even in the avoid list.
+- `agents/prompts/style_block_image.md` + `style_block_typography.md` - 3D still; the
+  headline sits on a white card, one line, no handwritten CTA or arrow.
+- `agents/prompts/style_block_video.md` - continues the still's 3D style. Plain wording:
+  the first version (naming Bluey, "squash-and-stretch", "comic timing hits") was
+  blocked by Omni every time.
+- `agents/prompts/generator.md` - posts are built on one relatable moment people would
+  send to a friend; the on-screen line is the punchline, complete without the caption;
+  the tip moves to the caption as a friend's trick; captions are 2-4 sentences, <450
+  chars, ending in a share or comment prompt. Raw search queries go in the discovery
+  line, never pasted into a sentence (a test caption read "hoe lang pauze zitten kantoor
+  perfect is?"). Clocks and screens in a scene match the time in the headline.
+- `agents/prompts/caption_*.md` - same shape per template; observation closes with a
+  share prompt, question with one story question, hot-take with a calm stance or tag.
+- `tools/edit_post.py` (edit prompt) - new hooks are one line; an old two-line hook
+  keeps its CTA when only the words change.
+- `agents/pipeline.py` - the takeaway's action may sit anywhere in the (short) caption;
+  meal moments ("bij je lunch") count as a dose.
+
 ## 2026-10-01 (d) - a dead link is worse provenance than none
 - `agents/pipeline.py` + `agents/schemas.py` - every `source_url` is now fetched and
   verified at research time, and nulled when the page does not exist. An audit found
