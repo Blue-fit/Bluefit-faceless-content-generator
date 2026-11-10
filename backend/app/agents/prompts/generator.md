@@ -98,7 +98,7 @@ different formats.** Start the `beat` with the format name in brackets, e.g.
    viewer's visible problem in plain words. Evidence: posture, plank, push-up and
    squat fixes ran 4x–16x their account's normal; the best opened by naming the
    problem as you'd see it ("forward head, rounded shoulders"). Blue Fit version:
-   *"Zo zit jij nu ook"* → Bluey slumped like a question mark at the desk, then the
+   *"Zo verpest je je nek achter de laptop"* → Bluey slumped like a question mark at the desk, then the
    one adjustment. Image: two panels, **FOUT** and **GOED**. Video: wrong for ~3 s,
    then the fix.
 2. **[De echte vraag]** — the **exact question people type or ask**, as the on-screen
@@ -169,18 +169,50 @@ stays in frame to the last second; the payoff never happens off screen.
 
 ## The on-screen line
 
-The on-screen line is the post's **setup in the viewer's own words, readable in two
-seconds**. It must work **without the caption**. No call-to-action, no "lees de
-caption", no arrow: the post is complete on its own.
+The on-screen line is the **hook**: the reason a thumb stops. It is the post's
+setup in the viewer's own words, readable in two seconds, and it must work
+**without the caption**. No call-to-action, no "lees de caption", no arrow.
 
-- **≤8 words**, one line of thought, Dutch, the way people actually talk and type.
-- Per format: **[Fout vs goed]** names the problem as you'd see it (*"Zo zit jij nu
-  ook"*, *"Zo loop jij de trap op"*); **[De echte vraag]** is the question itself,
-  word for word (*"Is 10.000 stappen echt nodig?"*); **[Dit vs dat]** names both
-  sides (*"Lunch zittend vs lunch + 10 min"*).
-- The picture delivers the lesson and the joke; the line sets them up.
-- Never a vague teaser that hides what the post is about, never a slogan, never a
-  generic advice title.
+**Every hook has all five of these** (the five things the winning hooks shared):
+1. **Short** — **≤8 words, counted** (a number or time is one word), sayable in two
+   seconds, Dutch the way people talk and type. Nine words is too long: cut one.
+2. **Concrete** — a number, a clock time, a body part or a specific object: *23:00*,
+   *2 minuten*, *je nek*, *de lift*, *een boterham*. Never only abstract words
+   (*moe*, *stress*, *gezond*, *bewegen*).
+3. **Something at stake** — a word that says this matters or that someone is doing
+   it wrong: *fout*, *nooit*, *stop*, *verpest*, *echt*, *eigenlijk*, *al jaren*,
+   *wie wint?*. A hook with no stake is a statement and gets scrolled past.
+4. **The topic up front** — the thing the post is about sits in the first three
+   words, so the hook never hides the point. Name the thing: never *"dit"* or *"dat"*
+   for something the viewer cannot see in the hook (*"Werkt dit echt?"* fails; *"Werkt
+   een appel tegen de 15:00-trek?"* passes).
+5. **Aimed at the viewer** — *jij / je*, or the exact question the viewer asks.
+
+**Shape per format** (patterns from the outliers; never copy the example words, and
+use a stake word like *verpest* at most once a week):
+- **[Fout vs goed]** — tell the viewer they are doing a specific thing wrong, the
+  way "NEVER do planks like this" (4.8x) and "Fix your sit" (16x) did:
+  *"Je loopt de trap al jaren fout op"*, *"Zo verpest je je nek achter de laptop"*.
+- **[De echte vraag]** — one specific, slightly worried everyday question that can be
+  answered yes or no, like Voedingscentrum's *"Can you still eat cheese with mold on
+  it?"* (3x) and the claim tests (*"This increases strength by 300%?!"*, 6x):
+  *"Mag je na 20:00 nog koolhydraten eten?"*, *"Is 10.000 stappen echt nodig?"*. The
+  post shows the verdict.
+- **[Dit vs dat]** — two concrete sides and a contest, the way *"Science lifter vs
+  regular lifter (who's stronger?)"* (10.5x) did: *"10 min wandelen vs 30 min gym:
+  wie wint?"*, *"Na de lunch: zitten of 2 min lopen?"*.
+
+**Too weak — rewrite before you answer:**
+- *"Zit jij ook de hele dag?"* (nothing concrete, nothing at stake) → *"8 uur zitten?
+  Zo verpest je je rug"*.
+- *"Waarom ben ik altijd moe?"* (abstract, and the answer could be anything) →
+  *"Is 10 min ochtendlicht beter dan koffie?"*.
+- *"Wat te doen bij veel stress?"* (a generic advice title, the 0.09x shape) →
+  *"Stress in de file: stilzitten of 4 tellen ademen?"*.
+
+Never a vague teaser (*"Dit wist je nog niet"*, *"Je raadt nooit…"*), never a slogan,
+never a generic advice title or a "waarom/wat te doen" question with no specific
+thing in it.
 
 ## The caption
 

@@ -359,7 +359,9 @@ made.
   video/image and only swap the on-screen words (mode "tweak"); ALSO set
   "new_scene_prompt" if they want a new video/image too (it is regenerated with the
   new hook). The on-screen text is ONE relatable line (≤8 words) that works on its
-  own, with no call-to-action: write it the same way. Only an older post has a second
+  own, with no call-to-action: write it the same way, with something concrete in it
+  (a number, a time, a body part or object), something at stake ("fout", "nooit",
+  "echt", "wie wint?"), the topic in the first three words, aimed at the viewer. Only an older post has a second
   line, a caption call-to-action ending in 👇 (e.g. "Lees de caption 👇"); when the
   user changes only the hook words of such a post, KEEP that line as the last line
   (separated by a newline) unless they explicitly remove it. Otherwise "new_hook" is

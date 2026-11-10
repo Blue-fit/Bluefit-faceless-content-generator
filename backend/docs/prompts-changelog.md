@@ -1,5 +1,16 @@
 # Prompts changelog
 
+## 2026-11-10 - stronger hooks (decisions/012)
+- `agents/prompts/generator.md` - "The on-screen line" now requires the five things the
+  ig-viral outliers' hooks shared: ≤8 words (counted), something concrete (number,
+  time, body part, object), something at stake (fout, nooit, echt, wie wint?), the
+  topic in the first three words (never a bare "dit"), aimed at the viewer. Per-format
+  shapes taken from the winners (NEVER do X like this / the specific worried question /
+  A vs B: wie wint?) and three weak-to-strong rewrites. The first live week under the
+  new formats came out with flat, generic hooks ("Wat te doen bij veel stress?").
+  Text-only probe: 9 of 9 hooks concrete with a stake, one ran to 10 words.
+- `tools/edit_post.py` - the edit classifier writes new hooks to the same five rules.
+
 ## 2026-11-10 - relatable AND a lesson: three researched formats (decisions/012)
 - `agents/prompts/generator.md` - every post is relatable ("dit ben ik") and teaches one
   thing ("o, zo dus"), with the lesson visible in the post. Each post uses one of three
